@@ -1,0 +1,27 @@
+{
+  "name": "infira/poesis-mg",
+  "autoload": {
+	"psr-4": {
+	  "Infira\\pmg\\helper\\": "src/helper",
+	  "Infira\\pmg\\": "src/"
+	}
+  },
+  "minimum-stability": "dev",
+  "authors": [
+	{
+	  "name": "Gen Taliar",
+	  "email": "gen@infira.ee"
+	}
+  ],
+  "bin": [
+	"bin/pmg"
+  ],
+  "require": {
+	"symfony/yaml": "5.*",
+	"symfony/console": "5.*",
+	"symfony/process": "5.*",
+	"infira/utils": "2.*",
+	"infira/errorhandler": "1.4.*",
+	"illuminate/support": "8.x-dev"
+  }
+}
