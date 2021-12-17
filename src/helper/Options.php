@@ -239,11 +239,6 @@ class Options extends Config
 		return $this->config['modelShortcut']['name'];
 	}
 	
-	public function getShortcutNamespace(): string
-	{
-		return $this->config['modelShortcut']['namespace'];
-	}
-	
 	public function getShortcutTraitFileNameExtension(): string
 	{
 		return $this->config['modelShortcut']['fileExt'];

@@ -81,9 +81,9 @@ class Pmg extends Command
 		$vars['shortcutName']      = $this->opt->getShortcutName();
 		$vars['useNamespace']      = '';
 		$vars['shortcutNamespace'] = self::REMOVE_EMPTY_LINE;
-		if ($this->opt->getShortcutNamespace())
+		if ($this->opt->getNamespace())
 		{
-			$vars['shortcutNamespace'] = 'namespace ' . $this->opt->getShortcutNamespace() . ';';
+			$vars['shortcutNamespace'] = 'namespace ' . $this->opt->getNamespace() . ';';
 		}
 		$template    = Variable::assign($vars, $this->getTemplate("ModelShortcut_Template.txt"));
 		$madeFiles[] = $this->makeFile($createPath . $this->getShortcutTraitFileName(), $template);
