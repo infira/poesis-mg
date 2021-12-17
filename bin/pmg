@@ -12,11 +12,6 @@ else
 	require __DIR__ . '/../vendor/autoload.php';
 }
 
-function br2nl(string $str)
-{
-	return str_replace(['<br />', '<br>', '< br>'], "\n", $str);
-}
-
 Bin::init(realpath(__DIR__));
 /**
  * @var \Symfony\Component\Console\Application $app
