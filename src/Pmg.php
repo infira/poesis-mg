@@ -11,16 +11,22 @@ use Infira\Utils\Variable;
 use Infira\Utils\Regex;
 use Infira\Utils\File;
 use Illuminate\Support\Str;
+use Infira\console\Command;
 
 class Pmg extends Command
 {
 	const REMOVE_EMPTY_LINE = '[REMOVE_EMPTY_LINE]';
-	private string $dbTablesMethods = '';
-	private string $dbName          = '';
+	private $dbTablesMethods = '';
+	private $dbName          = '';
 	
-	private helper\Db      $db;
-	private helper\Options $opt;
-	
+	/**
+	 * @var \Infira\pmg\helper\Db
+	 */
+	private $db;
+	/**
+	 * @var \Infira\pmg\helper\Options
+	 */
+	private $opt;
 	
 	public function __construct()
 	{
@@ -82,7 +88,10 @@ class Pmg extends Command
 		$template    = Variable::assign($vars, $this->getTemplate("ModelShortcut_Template.txt"));
 		$madeFiles[] = $this->makeFile($createPath . $this->getShortcutTraitFileName(), $template);
 		
-		return $madeFiles;
+		$this->output->region('Made models', function () use ($madeFiles)
+		{
+			$this->output->dumpArray($madeFiles);
+		});
 	}
 	
 	/**

@@ -17,11 +17,7 @@
 	"bin/pmg"
   ],
   "require": {
-	"symfony/yaml": "5.*",
-	"symfony/console": "5.*",
-	"symfony/process": "5.*",
-	"infira/utils": "2.*",
-	"infira/errorhandler": "1.4.*",
+	"infira/console": "*",
 	"illuminate/support": "8.x-dev"
   }
 }

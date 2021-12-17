@@ -8,82 +8,16 @@ use Infira\Utils\Regex;
 use Infira\Utils\File;
 use stdClass;
 use Exception;
-use Symfony\Component\Yaml\Yaml;
 use Infira\Utils\Variable;
+use Infira\console\helper\Config;
+use Infira\console\Bin;
 
-class Options
+class Options extends Config
 {
-	private array $config;
-	
 	public function __construct(string $yamlPath)
 	{
-		$this->config = array_merge(Yaml::parseFile(PMG_PATH . "bin/defaults.yaml"), Yaml::parseFile($yamlPath));
-	}
-	
-	private function getPathArr(string $configPath): array
-	{
-		return explode('.', $configPath);;
-	}
-	
-	public function get(string $configPath)
-	{
-		if (!$this->exists($configPath))
-		{
-			throw new Exception("config path $configPath does not exist");
-		}
-		$to = &$this->config;
-		foreach ($this->getPathArr($configPath) as $p)
-		{
-			$to = &$to[$p];
-		}
-		
-		return $to;
-	}
-	
-	public function exists(string $configPath): bool
-	{
-		$to = &$this->config;
-		foreach ($this->getPathArr($configPath) as $p)
-		{
-			if (!array_key_exists($p, $to))
-			{
-				return false;
-			}
-		}
-		
-		return true;
-	}
-	
-	private function set(string $configPath, $value)
-	{
-		$to    = &$this->config;
-		$lastP = null;
-		foreach ($this->getPathArr($configPath) as $p)
-		{
-			if (!array_key_exists($p, $to))
-			{
-				$to[$p] = new stdClass();
-			}
-			$to    = &$to[$p];
-			$lastP = $p;
-		}
-		$to[$lastP] = $value;
-	}
-	
-	private function add(string $configPath, $value)
-	{
-		$to    = &$this->config;
-		$lastP = null;
-		foreach ($this->getPathArr($configPath) as $p)
-		{
-			if (!property_exists($to, $p))
-			{
-				$to[$p] = new stdClass();
-			}
-			$to    = &$to[$p];
-			$lastP = $p;
-		}
-		$to[$lastP][] = $value;
+		parent::__construct(Bin::getPath('defaults.yaml'));
+		$this->mergeConfig($yamlPath);
 	}
 	
 	private function setModelConfig(string $model, string $config, $configValue)
