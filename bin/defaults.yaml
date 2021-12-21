@@ -4,7 +4,9 @@ connection:
   pass: null
   db: null
 
-namespace : ''
+namespace : null
+destinationPath: /Users/gentaliaru/ws/git/gitHubInfira/poesis-mg/tmp/models
+extensionsPath: null
 voidTables : []
 
 
@@ -33,6 +35,5 @@ model:
 
 modelShortcut:
   name: PoesisModelShortcut
-  namespace: ''
   fileExt: 'trait.php'
   imports: [ ]

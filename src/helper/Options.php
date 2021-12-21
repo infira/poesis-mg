@@ -42,7 +42,7 @@ class Options extends Config
 			return $this->config['model'];
 		}
 		
-		return array_merge((array)$this->config['models'][$model], (array)$this->config['model']);
+		return array_merge($this->config['model'], $this->config['models'][$model]);
 	}
 	
 	public function isTableVoided(string $table): bool
@@ -50,66 +50,88 @@ class Options extends Config
 		return in_array($table, $this->config['voidTables']);
 	}
 	
-	
-	//TODO
-	public function scanExtensions(string $path)
+	public function scanExtensions()
 	{
+		$path = $this->getExtensionsPath();
+		if ($path === null)
+		{
+			return;
+		}
 		if (!is_dir($path))
 		{
-			throw new Exception("scan model extendor folder must be correct path($path)");
+			throw new Exception("scan model extensions folder must be correct path($path)");
 		}
 		foreach (Dir::getFileNames($path) as $fn)
 		{
-			$extension = str_replace('.php', '', $fn);
-			if ($model = $this->findFileExtension($path, $fn, 'Model'))
+			$file = Dir::fixPath($path) . $fn;
+			if ($dm = $this->findFileExtension($file, 'Model'))
 			{
-				$this->setModelExtender($model->model, $model->extension);
+				$this->setModelExtender($dm->model, $dm->extension);
 			}
-			elseif (substr($extension, -9) == 'Extension')
+			elseif ($dm = $this->findFileExtension($file, 'Trait'))
 			{
-				$model = substr($extension, 0, -9);
-				$this->addModelTrait($model, $extension);
+				$this->addModelTrait($dm->model, $dm->extension);
 			}
-			elseif ($dm = $this->findFileExtension($path, $fn, 'DataMethods'))
+			elseif ($dm = $this->findFileExtension($file, 'DataMethods'))
 			{
 				$this->setModelDataMethodsClass($dm->model, $dm->extension);
 			}
-			elseif ($dm = $this->findFileExtension($path, $fn, 'Node'))
+			elseif ($dm = $this->findFileExtension($file, 'Node'))
 			{
 				$this->setModelNodeExtendor($dm->model, $dm->extension);
+			}
+			if (isset($dm))
+			{
+				foreach ($dm->imports as $import)
+				{
+					$this->addModelImport($dm->model, $import);
+				}
 			}
 		}
 	}
 	
-	private function findFileExtension($path, $file, $type): ?stdClass
+	private function findFileExtension($file, $type): ?stdClass
 	{
-		$extension = str_replace('.php', '', $file);
+		$pi       = (object)pathinfo($file);
+		$fileName = $pi->filename;
+		
 		$len       = strlen($type) * -1;
-		if (substr($extension, $len) == $type)
+		$extension = $fileName;
+		if (substr($fileName, $len) == $type)
 		{
-			$model       = substr($extension, 0, $len);
-			$fileContent = File::getContent($path . $file);
-			//$con = Regex::getMatches('/<?php(.*)?class/ms', $fileContent);
+			$model       = substr($fileName, 0, $len);
+			$fileContent = File::getContent($file);
+			$imports     = [];
 			if (Regex::isMatch('/namespace (.+)?;/m', $fileContent))
 			{
 				$matches = [];
 				preg_match_all('/namespace (.+)?;/m', $fileContent, $matches);
-				$this->addModelImport($model, '\\' . $matches[1][0] . '\\' . $extension);
+				$imports[] = '\\' . $matches[1][0] . '\\' . $extension;
 			}
 			else
 			{
 				$extension = '\\' . $extension;
 			}
 			
-			return (object)['model' => $model, 'extension' => $extension];
+			return (object)['model' => $model, 'extension' => $extension, 'imports' => $imports];
 		}
 		
 		return null;
 	}
 	
-	public function getNamespace(): string
+	public function getNamespace(): ?string
 	{
 		return $this->config['namespace'];
+	}
+	
+	public function getDestinationPath(): string
+	{
+		return $this->config['destinationPath'];
+	}
+	
+	public function getExtensionsPath(): ?string
+	{
+		return $this->config['extensionsPath'];
 	}
 	
 	//region model options

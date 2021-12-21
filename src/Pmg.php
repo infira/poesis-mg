@@ -12,6 +12,8 @@ use Infira\Utils\Regex;
 use Infira\Utils\File;
 use Illuminate\Support\Str;
 use Infira\console\Command;
+use Infira\pmg\templates\SchemaTemplate;
+use Infira\pmg\templates\ModelTemplate;
 
 class Pmg extends Command
 {
@@ -36,7 +38,6 @@ class Pmg extends Command
 	public function configure(): void
 	{
 		$this->addArgument('yaml', InputArgument::REQUIRED);
-		$this->addArgument('path', InputArgument::REQUIRED);
 	}
 	
 	/**
@@ -44,30 +45,33 @@ class Pmg extends Command
 	 */
 	public function runCommand()
 	{
-		$yamlFile   = $this->input->getArgument('yaml');
-		$createPath = $this->input->getArgument('path');
+		$yamlFile = $this->input->getArgument('yaml');
 		
 		if (!file_exists($yamlFile))
 		{
 			$this->error('Config files does not exist');
 		}
 		
-		if (!is_dir($createPath))
+		$this->opt = new Options($yamlFile);
+		
+		$destinationPath = $this->opt->getDestinationPath();
+		if (!is_dir($destinationPath))
 		{
-			$this->error("create path $createPath not found");
+			$this->error("create path $destinationPath not found");
 		}
-		if (!is_writable($createPath))
+		if (!is_writable($destinationPath))
 		{
 			$this->error('create path not writable');
 		}
-		$createPath = Dir::fixPath($createPath);
+		$destinationPath = Dir::fixPath($destinationPath);
 		
-		$this->opt    = new Options($yamlFile);
+		
 		$connection   = (object)$this->opt->get('connection');
 		$this->db     = new Db('pmg', $connection->host, $connection->user, $connection->pass, $connection->db, $connection->port);
 		$this->dbName = $connection->db;
+		$this->opt->scanExtensions();
 		
-		$madeFiles    = $this->makeTableClassFiles($createPath);
+		$madeFiles    = $this->makeTableClassFiles($destinationPath);
 		$vars         = [];
 		$vars['body'] = '';
 		if ($traits = $this->opt->getShortcutImports())
@@ -86,7 +90,7 @@ class Pmg extends Command
 			$vars['shortcutNamespace'] = 'namespace ' . $this->opt->getNamespace() . ';';
 		}
 		$template    = Variable::assign($vars, $this->getTemplate("ModelShortcut_Template.txt"));
-		$madeFiles[] = $this->makeFile($createPath . $this->getShortcutTraitFileName(), $template);
+		$madeFiles[] = $this->makeFile($destinationPath . $this->getShortcutTraitFileName(), $template);
 		
 		$this->output->region('Made models', function () use ($madeFiles)
 		{
@@ -175,18 +179,23 @@ class Pmg extends Command
 				$templateVars["tableName"] = $tableName;
 				$templateVars["className"] = $model;
 				
-				$templateVars["isView"]    = ($Table->Table_type == "VIEW") ? "true" : "false";
-				$templateVars["aiColumn"]  = 'null';
-				$templateVars["TIDColumn"] = 'null';
+				$schemaTemplate                       = new SchemaTemplate($model);
+				$schemaTemplate->createModelClassName = $model;
+				$schemaTemplate->modelName            = $model;
+				$schemaTemplate->tableName            = $tableName;
+				
+				$modelTemplate            = new ModelTemplate($model, $this->opt->getNamespace());
+				$modelTemplate->tableName = $tableName;
+				
+				
+				$schemaTemplate->isView = $Table->Table_type == "VIEW";
 				if ($this->opt->isModelTIDEnabled($model) and isset($Table->columns[$this->opt->getModelTIDColumnName($model)]))
 				{
-					$templateVars["TIDColumn"] = "'" . $this->opt->getModelTIDColumnName($model) . "'";
+					$schemaTemplate->TIDColumn = $this->opt->getModelTIDColumnName($model);
 				}
 				
-				$templateVars["autoAssistProperty"] = self::REMOVE_EMPTY_LINE;
-				$templateVars["nodeProperties"]     = '';
-				$templateVars["columnMethods"]      = '';
-				$templateVars["primaryColumns"]     = '[]';
+				$templateVars["nodeProperties"] = '';
+				$templateVars["columnMethods"]  = '';
 				
 				$templateVars["modelTraits"] = self::REMOVE_EMPTY_LINE;
 				if ($modelTraits = $this->opt->getModelTraits($model))
@@ -198,21 +207,14 @@ class Pmg extends Command
 					$templateVars["modelTraits"] = join("\n", $modelTraits);
 				}
 				
-				$primaryColumns = [];
 				if ($result = $this->db->query("SHOW INDEX FROM `$tableName` WHERE Key_name = 'PRIMARY'"))
 				{
 					while ($Index = $result->fetch_object())
 					{
-						$primaryColumns[] = "'" . $Index->Column_name . "'";
+						$schemaTemplate->addPrimaryColumn($Index->Column_name);
 					}
 				}
-				if ($primaryColumns)
-				{
-					$templateVars["primaryColumns"] = "[" . join(",", $primaryColumns) . "]";
-				}
-				$templateVars["columnTypes"]   = '';
-				$templateVars["columnNames"]   = '';
-				$templateVars['modelExtender'] = $this->opt->getModelExtender($tableName);
+				$modelTemplate->setModelClass($this->opt->getModelExtender($model));
 				
 				$newModelName = '\\' . $model;
 				if ($this->opt->getNamespace())
@@ -285,15 +287,10 @@ class Pmg extends Command
 					{
 						$commentTypes = $rep[$type];
 					}
-					$commentTypes .= '|Field';
-					
-					$columnParamType   = explode('|', $commentTypes)[0];
-					$Column["Comment"] = $Column['Type'];
-					$Desc              = (isset($Column["Comment"]) && $Column["Comment"]) ? ' - ' . $Column["Comment"] : '';
-					
-					$templateVars["autoAssistProperty"] .= '
- * @property %modelColumnClassLastName% $' . $columnName . ' ' . $columnParamType . $Desc;
-					
+					$commentTypes    .= '|Field';
+					$Column["types"] = explode('|', $commentTypes);
+					$columnParamType = $Column["types"][0];
+					$modelTemplate->setColumn($columnName, $Column);
 					
 					$templateVars["columnMethods"] .= '
 	/**
@@ -311,21 +308,28 @@ class Pmg extends Command
 					
 					
 					$columnCommentParam[$columnName] = '* @param ' . $columnParamType . ' $' . $columnName;
-					$templateVars["columnNames"]     .= "'" . $columnName . "'" . ((!$isLast) ? ',' : '');
 					
 					
 					$isInt    = (strpos($type, "int") !== false);
 					$isNumber = (in_array($type, ["decimal", "float", "real", "double"]));
+					$isAi     = $Column["Extra"] == "auto_increment";
+					$isNull   = $Column["Null"] == "YES";
 					
-					$allowedValues = '';
-					$length        = "null";
+					if ($Column["Extra"] == "auto_increment")
+					{
+						$schemaTemplate->aiColumn = $columnName;
+					}
+					
+					$signed        = (bool)strpos(strtolower($Column['Type']), "unsigned") !== false;
+					$length        = null;
+					$allowedValues = [];
 					if (strpos($Column['Type'], "enum") !== false)
 					{
-						$allowedValues = str_replace(["enum", "(", ")"], "", $Column['Type']);
+						$allowedValues = [str_replace(["enum", "(", ")"], "", $Column['Type'])];
 					}
 					elseif (strpos($Column['Type'], "set") !== false)
 					{
-						$allowedValues = str_replace(["set", "(", ")"], "", $Column['Type']);
+						$allowedValues = [str_replace(["set", "(", ")"], "", $Column['Type'])];
 					}
 					else
 					{
@@ -339,13 +343,13 @@ class Pmg extends Command
 							}
 						}
 					}
-					
-					$isAi   = $Column["Extra"] == "auto_increment";
-					$isNull = $Column["Null"] == "YES";
-					
+					if (in_array($type, ['timestamp', 'date', 'datetime']) or is_numeric($length))
+					{
+						$length = intval($length);
+					}
 					if ($isAi)
 					{
-						$default = "''";
+						$default = '';
 					}
 					elseif ($isInt or $isNumber)
 					{
@@ -355,7 +359,7 @@ class Pmg extends Command
 					{
 						if ($Column['Default'] === null and $isNull)
 						{
-							$default = 'NULL';
+							$default = null;
 						}
 						elseif ($Column['Default'] === null)
 						{
@@ -363,35 +367,15 @@ class Pmg extends Command
 						}
 						elseif ($Column['Default'] == "''")
 						{
-							$default = "''";
+							$default = '';
 						}
 						else
 						{
-							$default = "'" . addslashes($Column['Default']) . "'";
+							$default = addslashes($Column['Default']);
 						}
 						
 					}
-					if (in_array($type, ['timestamp', 'date', 'datetime']))
-					{
-						$length = intval($length);
-					}
-					
-					$vars                        = [];
-					$vars["fn"]                  = $columnName;
-					$vars["t"]                   = $type;
-					$vars["sig"]                 = (strpos(strtolower($Column['Type']), "unsigned") !== false) ? "FALSE" : "TRUE";
-					$vars["len"]                 = $length;
-					$vars["def"]                 = $default;
-					$vars["aw"]                  = $allowedValues;
-					$vars["in"]                  = ($isNull) ? "TRUE" : "FALSE";
-					$vars["isAi"]                = ($isAi) ? "TRUE" : "FALSE";//isAuto Increment
-					$templateVars["columnTypes"] .= '
-		' . Variable::assign($vars, 'self::$columnStructure[' . "'%fn%'] = ['type'=>'%t%','signed'=>%sig%,'length'=>%len%,'default'=>%def%,'allowedValues'=>[%aw%],'isNull'=>%in%,'isAI'=>%isAi%];");
-					
-					if ($Column["Extra"] == "auto_increment")
-					{
-						$templateVars["aiColumn"] = "'" . $columnName . "'";
-					}
+					$schemaTemplate->setColumn($columnName, $type, $signed, $length, $default, $allowedValues, $isNull, $isAi);
 				} //EOF each columns
 				
 				//make index methods
@@ -437,48 +421,21 @@ class Pmg extends Command
 ';
 				}
 				
-				$max = 0;
-				foreach (explode("\n", $templateVars['columnTypes']) as $line)
-				{
-					$line = trim($line);
-					$max  = max($max, strlen(substr($line, 0, strpos($line, '=') + 1)));
-				}
-				foreach (explode("\n", $templateVars['columnTypes']) as $line)
-				{
-					$line = trim($line);
-					if ($line)
-					{
-						$b                           = substr($line, 0, strpos($line, '=') + 1);
-						$len                         = strlen($b);
-						$f                           = str_replace('=', str_pad(" ", ($max - $len) + 1) . '=', $b);
-						$templateVars['columnTypes'] = str_replace($b, $f, $templateVars['columnTypes']);
-					}
-				}
-				$templateVars['columnTypes'] = ltrim($templateVars['columnTypes']);
 				
-				$modelImports = [];
-				foreach ($this->opt->getModelImports($model) as $ik => $name)
-				{
-					$modelImports[$ik] = "use $name;";
-				}
-				$templateVars['modelImports']   = $modelImports ? join("\n", $modelImports) : self::REMOVE_EMPTY_LINE;
-				$templateVars['modelNamespace'] = self::REMOVE_EMPTY_LINE;
-				if ($this->opt->getNamespace())
-				{
-					$templateVars['modelNamespace'] = 'namespace ' . $this->opt->getNamespace() . ';';
-				}
+				$modelTemplate->addImports($this->opt->getModelImports($model));
 				
-				$templateVars['node']                       = $this->getModelNodeContent($templateVars, $model);
-				$templateVars['dataMethodsClass']           = $this->opt->getModelDataMethodsClass($model);
-				$templateVars['dataMethods']                = $this->getModelDataMethodsClassContent($templateVars, $model);
-				$templateVars['modelDefaultConnectionName'] = $this->opt->getModelConnectionName($model);
-				$templateVars['modelNewClass']              = $this->constructFullName($model);
-				$templateVars['dbName']                     = $this->dbName;
-				$templateVars['modelColumnClassName']       = $this->opt->getModelColumnClass($model);
-				$templateVars['loggerEnabled']              = $this->opt->isModelLogEnabled($model) ? 'true' : 'false';
-				$templateVars['useModelColumnClass']        = $templateVars['modelColumnClassName'][0] == '\\' ? substr($templateVars['modelColumnClassName'], 1) : $templateVars['modelColumnClassName'];
-				$ex                                         = explode('\\', $templateVars['modelColumnClassName']);
-				$templateVars['modelColumnClassLastName']   = end($ex);
+				$modelTemplate->setDataMethodsClass($this->opt->getModelDataMethodsClass($model));
+				$modelTemplate->setModelColumnClassName($this->opt->getModelColumnClass($model));
+				$modelTemplate->loggerEnabled              = $this->opt->isModelLogEnabled($model);
+				$modelTemplate->modelDefaultConnectionName = $this->opt->getModelConnectionName($model);
+				$schemaTemplate->createModelClassName      = $this->constructFullName($model);
+				$modelTemplate->setModelClassPath($this->constructFullName($model));
+				$templateVars['node']        = $this->getModelNodeContent($templateVars, $model);
+				$templateVars['dataMethods'] = $this->getModelDataMethodsClassContent($templateVars, $model);
+				$templateVars['dbName']      = $this->dbName;
+				
+				$templateVars['model']  = $modelTemplate->getCode();
+				$templateVars['schema'] = $schemaTemplate->getCode();
 				
 				$collectedFiles[$model . '.' . $this->opt->getModelFileNameExtension()] = $this->getTemplate("ModelTemplate.txt", $templateVars);
 			}
@@ -532,7 +489,7 @@ class Pmg extends Command
 		}
 		$vars['createNodeClassArguments'] = '$constructorArguments';
 		
-		$vars['dataMethodsClassName'] = $vars['dataMethodsClass'] = $model . 'DataMethods';
+		$vars['dataMethodsClassName'] = $this->opt->getModelDataMethodsClass($model);
 		$vars['nodeClassFullPath']    = $this->constructFullName($this->opt->getModelNodeClassName($model));
 		$vars['dataMethodsTraits']    = self::REMOVE_EMPTY_LINE;
 		if ($trTraits = $this->opt->getModelDataMethodsTraits($model))
