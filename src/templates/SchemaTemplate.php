@@ -21,9 +21,9 @@ class SchemaTemplate extends ClassTemplate
 	private $primaryColumns = [];
 	
 	
-	public function __construct(string $model)
+	public function __construct(string $name)
 	{
-		parent::__construct($model . 'Schema');
+		parent::__construct('class', $name . 'Schema');
 		$this->constructor = $this->createMethod('construct');
 		$this->constructor->setStatic();
 		$this->class->addTrait('\Infira\Poesis\orm\Schema');

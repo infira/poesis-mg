@@ -25,9 +25,9 @@ abstract class ClassTemplate extends Template
 	 */
 	private $ns = null;
 	
-	public function __construct(string $class, ?string $namespace = '')
+	public function __construct(string $type, string $name, ?string $namespace = '')
 	{
-		parent::__construct(new ClassType($class), 'class');
+		parent::__construct(ClassType::$type($name), 'class');
 		$this->ns = new PhpNamespace($namespace);
 	}
 	
@@ -39,6 +39,7 @@ abstract class ClassTemplate extends Template
 			$method = $method->construct();
 		});
 		$this->class->setMethods($this->methods);
+		$this->addComment('@author https://github.com/infira/poesis-mg');
 		
 		$printable = $this->class;
 		if ($this->ns !== null)
@@ -69,6 +70,12 @@ abstract class ClassTemplate extends Template
 	{
 		$this->ns->addUse($name, $alias);
 	}
+	
+	public function addTraits(array $imports)
+	{
+		array_walk($imports, [$this, 'addTrait']);
+	}
+	
 	
 	public function setClassVariable(string $varName, string $class, string $alias = null): void
 	{

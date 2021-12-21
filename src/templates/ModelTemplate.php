@@ -3,6 +3,8 @@
 namespace Infira\pmg\templates;
 
 
+use Illuminate\Support\Str;
+
 class ModelTemplate extends ClassTemplate
 {
 	/**
@@ -20,11 +22,21 @@ class ModelTemplate extends ClassTemplate
 	private $columns = [];
 	
 	
-	public function __construct(string $model, ?string $namespace = '')
+	public function __construct(string $name, ?string $namespace = '')
 	{
-		parent::__construct($model, $namespace);
+		addExtraErrorInfo('model', $name);
+		parent::__construct('class', $name, $namespace);
 		$this->constructor = $this->createMethod('__construct');
 		$this->constructor->addParameter('options', [])->setType('array');
+		
+		$select = $this->createMethod('select');
+		$select->addParameter('columns')
+			->setType($this->dataMethodsClass)
+			->setDefaultValue(null);
+		$select->addBodyLine('return parent::select($columns);');
+		$select->addComment('Select data from database');
+		$select->addComment('@param string|array $columns - fields to use in SELECT $fields FROM, * - use to select all fields, otherwise it will be exploded by comma');
+		
 		$this->import('\Infira\Poesis\Poesis');
 		$this->import('\Infira\Poesis\orm\node\Field');
 		
@@ -45,10 +57,30 @@ class ModelTemplate extends ClassTemplate
 		$this->addComment('@property ' . $this->createModelClassName . ' $Where class where values');
 		foreach ($this->columns as $columnName => $column)
 		{
+			addExtraErrorInfo('$columnName', [$columnName => $column]);
 			$desc = $column['Type'] . ((isset($column["Comment"]) and strlen($column["Comment"]) > 0) ? ' - ' . $column["Comment"] : '');
 			$this->addComment('@property ModelColumn $' . $columnName . ' ' . $desc);
+			
+			$methodName = ucfirst(Str::camel(Str::slug($columnName, '_')));
+			if (is_numeric($methodName[0]))
+			{
+				$methodName = "_$methodName";
+			}
+			
+			$method = $this->createMethod($methodName);
+			
+			$paramName = 'value';
+			
+			$method->addParameter($paramName)->setType(join('|', $column['types']));
+			$method->setReturnType('ModelColumn');
+			$method->addBodyLine('return $this->add(\'' . $columnName . '\', $' . $paramName . ');');
+			
+			$method->addComment('Set value for ' . $columnName);
+			$commentTypes = join('|', $column['types']);
+			$method->addComment('@param ' . $commentTypes . ' $' . $desc);
+			$method->addComment('@return ' . $this->createModelClassName);
+			clearExtraErrorInfo();
 		}
-		$this->addComment('@author https://github.com/infira/poesis-mg');
 	}
 	
 	public function setModelClassPath(string $modelClass): void
@@ -74,6 +106,41 @@ class ModelTemplate extends ClassTemplate
 	
 	public function setColumn(string $columnName, array $column)
 	{
+		$type              = $column['fType'];
+		$rep               = [];
+		$rep["varchar"]    = "string";
+		$rep["char"]       = "string";
+		$rep["tinytext"]   = "string";
+		$rep["mediumtext"] = "string";
+		$rep["text"]       = "string";
+		$rep["longtext"]   = "string";
+		
+		$rep["smallint"]  = "integer";
+		$rep["tinyint"]   = "integer";
+		$rep["mediumint"] = "integer";
+		$rep["int"]       = "integer";
+		$rep["bigint"]    = "integer";
+		
+		$rep["year"]      = "integer";
+		$rep["timestamp"] = "integer|string";
+		$rep["enum"]      = "string";
+		$rep["set"]       = "string|array";
+		$rep["serial"]    = "string";
+		$rep["datetime"]  = "string";
+		$rep["date"]      = "string";
+		$rep["float"]     = "float";
+		$rep["decimal"]   = "float";
+		$rep["double"]    = "float";
+		$rep["real"]      = "float";
+		if (!isset($rep[$type]))
+		{
+			$column["types"] = ['mixed'];
+		}
+		else
+		{
+			$column["types"] = [$rep[$type]];
+		}
+		$column["types"][]          = 'Field';
 		$this->columns[$columnName] = $column;
 	}
 }

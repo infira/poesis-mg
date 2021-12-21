@@ -14,12 +14,12 @@ use Illuminate\Support\Str;
 use Infira\console\Command;
 use Infira\pmg\templates\SchemaTemplate;
 use Infira\pmg\templates\ModelTemplate;
+use Infira\pmg\templates\ModelShortcutTemplate;
 
 class Pmg extends Command
 {
 	const REMOVE_EMPTY_LINE = '[REMOVE_EMPTY_LINE]';
-	private $dbTablesMethods = '';
-	private $dbName          = '';
+	private $dbName = '';
 	
 	/**
 	 * @var \Infira\pmg\helper\Db
@@ -29,6 +29,14 @@ class Pmg extends Command
 	 * @var \Infira\pmg\helper\Options
 	 */
 	private $opt;
+	
+	private $destination = '';
+	private $madeFiles   = [];
+	
+	/**
+	 * @var ModelShortcutTemplate
+	 */
+	private $shortcut;
 	
 	public function __construct()
 	{
@@ -51,10 +59,18 @@ class Pmg extends Command
 		{
 			$this->error('Config files does not exist');
 		}
-		
 		$this->opt = new Options($yamlFile);
 		
 		$destinationPath = $this->opt->getDestinationPath();
+		if ($destinationPath[0] != '/')
+		{
+			$rp              = dirname($yamlFile) . '/' . $destinationPath;
+			$destinationPath = Dir::fixPath(realpath(dirname($yamlFile) . '/' . $destinationPath));
+			if (!is_dir($destinationPath))
+			{
+				$this->error("create path $rp not found");
+			}
+		}
 		if (!is_dir($destinationPath))
 		{
 			$this->error("create path $destinationPath not found");
@@ -63,7 +79,7 @@ class Pmg extends Command
 		{
 			$this->error('create path not writable');
 		}
-		$destinationPath = Dir::fixPath($destinationPath);
+		$this->destination = $destinationPath = Dir::fixPath($destinationPath);
 		
 		
 		$connection   = (object)$this->opt->get('connection');
@@ -71,30 +87,15 @@ class Pmg extends Command
 		$this->dbName = $connection->db;
 		$this->opt->scanExtensions();
 		
-		$madeFiles    = $this->makeTableClassFiles($destinationPath);
-		$vars         = [];
-		$vars['body'] = '';
-		if ($traits = $this->opt->getShortcutImports())
-		{
-			foreach ($traits as $trait)
-			{
-				$vars['body'] .= 'use ' . $trait . ';' . "\n";
-			}
-		}
-		$vars['body']              .= $this->dbTablesMethods;
-		$vars['shortcutName']      = $this->opt->getShortcutName();
-		$vars['useNamespace']      = '';
-		$vars['shortcutNamespace'] = self::REMOVE_EMPTY_LINE;
-		if ($this->opt->getNamespace())
-		{
-			$vars['shortcutNamespace'] = 'namespace ' . $this->opt->getNamespace() . ';';
-		}
-		$template    = Variable::assign($vars, $this->getTemplate("ModelShortcut_Template.txt"));
-		$madeFiles[] = $this->makeFile($destinationPath . $this->getShortcutTraitFileName(), $template);
+		Dir::flushExcept($this->destination, [$this->getShortcutTraitFileName(), 'dummy.txt']);
+		$this->shortcut = new ModelShortcutTemplate($this->opt->getShortcutName());
+		$this->makeTableClassFiles();
+		$this->shortcut->addImports($this->opt->getShortcutImports());
+		$this->makeFile($this->getShortcutTraitFileName(), $this->shortcut->getCode());
 		
-		$this->output->region('Made models', function () use ($madeFiles)
+		$this->output->region('Made models', function ()
 		{
-			$this->output->dumpArray($madeFiles);
+			$this->output->dumpArray($this->madeFiles);
 		});
 	}
 	
@@ -114,28 +115,32 @@ class Pmg extends Command
 		return $this->opt->getNamespace() ? $this->opt->getNamespace() . '\\' . $model : $model;
 	}
 	
-	private function makeFile(string $fileName, $content): string
+	private function makeFile(string $fileName, $content)
 	{
-		File::delete($fileName);
-		$newLines = [];
-		foreach (explode("\n", $content) as $line)
-		{
-			if (strpos($line, self::REMOVE_EMPTY_LINE) === false)
-			{
-				$newLines[] = $line;
-			}
-		}
-		File::create($fileName, join("\n", $newLines), "w+", 0777);
+		$file = $this->destination . $fileName;
+		File::delete($file);
 		
-		return $fileName;
+		$file = realpath(dirname(__FILE__)) . '/templates/tmpl.txt';
+		if (!file_exists($file))
+		{
+			$this->error("Installer $file not found");
+		}
+		$con = File::getContent($file);
+		if ($vars)
+		{
+			return Variable::assign($vars, $con);
+		}
+		
+		File::create($file, "<?php \n\n" . $content, "w+", 0777);
+		
+		$this->madeFiles[] = $file;
 	}
 	
 	/**
 	 * @throws \Exception
 	 */
-	private function makeTableClassFiles(string $installPath): array
+	private function makeTableClassFiles()
 	{
-		$collectedFiles = [];
 		//$model             = new Model(['isGenerator' => true]);
 		$notAllowedColumns = [];//get_class_methods($model);
 		
@@ -175,9 +180,10 @@ class Pmg extends Command
 			{
 				$model = $this->constructModelName($tableName);
 				
-				$templateVars              = [];
-				$templateVars["tableName"] = $tableName;
-				$templateVars["className"] = $model;
+				$templateVars                   = [];
+				$templateVars["tableName"]      = $tableName;
+				$templateVars["className"]      = $model;
+				$templateVars["nodeProperties"] = '';
 				
 				$schemaTemplate                       = new SchemaTemplate($model);
 				$schemaTemplate->createModelClassName = $model;
@@ -194,18 +200,7 @@ class Pmg extends Command
 					$schemaTemplate->TIDColumn = $this->opt->getModelTIDColumnName($model);
 				}
 				
-				$templateVars["nodeProperties"] = '';
-				$templateVars["columnMethods"]  = '';
-				
-				$templateVars["modelTraits"] = self::REMOVE_EMPTY_LINE;
-				if ($modelTraits = $this->opt->getModelTraits($model))
-				{
-					foreach ($modelTraits as $key => $import)
-					{
-						$modelTraits[$key] = "use $import;";
-					}
-					$templateVars["modelTraits"] = join("\n", $modelTraits);
-				}
+				$modelTemplate->addTraits($this->opt->getModelTraits($model));
 				
 				if ($result = $this->db->query("SHOW INDEX FROM `$tableName` WHERE Key_name = 'PRIMARY'"))
 				{
@@ -226,88 +221,27 @@ class Pmg extends Command
 					}
 					$newModelName = '\\' . $mns . $model;
 				}
-				$this->dbTablesMethods .= '
-	/**
-	 * Method to return ' . $newModelName . ' class
-	 * @param array $options = []
-	 * @return ' . $newModelName . '|$this
-	 */
-	public static function ' . $model . '(array $options = [])
-	{
-		return new ' . $newModelName . '($options);
-	}
-				' . "\n";
 				
-				$isLast             = false;
-				$count              = count($Table->columns);
-				$key                = -1;
-				$columnCommentParam = [];
+				$shortcutMethod = $this->shortcut->createMethod($model);
+				$shortcutMethod->setStatic(true);
+				$shortcutMethod->addParameter('options')->setType('array');
+				$shortcutMethod->setReturnType($model);
+				$shortcutMethod->addBodyLine('return new ' . $newModelName . '($options);');
+				$shortcutMethod->addComment('Method to return ' . $newModelName . ' class');
+				$shortcutMethod->addComment('@param array $options = []');
+				$shortcutMethod->addComment('@return ' . $newModelName);
 				
 				foreach ($Table->columns as $Column)
 				{
-					$columnName = $Column['Field'];
-					$type       = Str::lower(preg_replace('/\(.*\)/m', '', $Column['Type']));
-					$type       = strtolower(trim(str_replace("unsigned", "", $type)));
-					$key++;
-					if (($key + 1) == $count)
-					{
-						$isLast = true;
-					}
+					$columnName      = $Column['Field'];
+					$type            = Str::lower(preg_replace('/\(.*\)/m', '', $Column['Type']));
+					$type            = strtolower(trim(str_replace("unsigned", "", $type)));
+					$Column['fType'] = $type;
 					
-					$rep               = [];
-					$rep["varchar"]    = "string";
-					$rep["char"]       = "string";
-					$rep["tinytext"]   = "string";
-					$rep["mediumtext"] = "string";
-					$rep["text"]       = "string";
-					$rep["longtext"]   = "string";
-					
-					$rep["smallint"]  = "integer";
-					$rep["tinyint"]   = "integer";
-					$rep["mediumint"] = "integer";
-					$rep["int"]       = "integer";
-					$rep["bigint"]    = "integer";
-					
-					$rep["year"]      = "integer";
-					$rep["timestamp"] = "integer|string";
-					$rep["enum"]      = "string";
-					$rep["set"]       = "string|array";
-					$rep["serial"]    = "string";
-					$rep["datetime"]  = "string";
-					$rep["date"]      = "string";
-					$rep["float"]     = "float";
-					$rep["decimal"]   = "float";
-					$rep["double"]    = "float";
-					$rep["real"]      = "float";
-					if (!isset($rep[$type]))
-					{
-						$commentTypes = 'mixed';
-					}
-					else
-					{
-						$commentTypes = $rep[$type];
-					}
-					$commentTypes    .= '|Field';
-					$Column["types"] = explode('|', $commentTypes);
-					$columnParamType = $Column["types"][0];
 					$modelTemplate->setColumn($columnName, $Column);
-					
-					$templateVars["columnMethods"] .= '
-	/**
-	 * Set value for ' . $columnName . '
-	 * @param ' . $commentTypes . ' $' . $columnParamType . ' - ' . $Column['Type'] . '
-	 * @return ' . $model . '
-	 */
-	public function ' . $columnName . '($' . $columnParamType . '): ' . $model . '
-	{
-		return $this->add(\'' . $columnName . '\', $' . $columnParamType . ');
-	}';
 					
 					$templateVars["nodeProperties"] .= '
     public $' . $columnName . ';';
-					
-					
-					$columnCommentParam[$columnName] = '* @param ' . $columnParamType . ' $' . $columnName;
 					
 					
 					$isInt    = (strpos($type, "int") !== false);
@@ -393,32 +327,16 @@ class Pmg extends Command
 				});
 				foreach ($indexMethods as $indexName => $columns)
 				{
-					$columnComment   = [];
-					$columnArguments = [];
-					$columnCalled    = [];
+					$columnComment = [];
+					$method        = $modelTemplate->createMethod($indexName . '_index');
 					foreach ($columns as $Col)
 					{
-						$columnComment[]   = $Col->Column_name;
-						$columnArguments[] = '$' . $Col->Column_name;
-						$columnCalled[]    = '
-		$this->add(\'' . $Col->Column_name . '\', $' . $Col->Column_name . ');';
+						$columnComment[] = $Col->Column_name;
+						$method->addParameter($Col->Column_name);
+						$method->addBodyLine('$this->add(\'' . $Col->Column_name . '\', $' . $Col->Column_name . ')');
 					}
-					$templateVars["columnMethods"] .= '
-	/**
-	 * Set value for ' . join(', ', $columnComment) . " index";
-					foreach ($columns as $Col)
-					{
-						$templateVars["columnMethods"] .= '
-	 ' . $columnCommentParam[$Col->Column_name];
-					}
-					$templateVars["columnMethods"] .= '
-	 * @return $model
-	 */
-	public function ' . $indexName . '_index(' . join(', ', $columnArguments) . ')
-	{   ' . join('', $columnCalled) . '
-	    return $this;
-	}
-';
+					$method->addBodyLine('return $this;');
+					$method->addComment('Set value for ' . join(', ', $columnComment) . ' index');
 				}
 				
 				
@@ -437,18 +355,9 @@ class Pmg extends Command
 				$templateVars['model']  = $modelTemplate->getCode();
 				$templateVars['schema'] = $schemaTemplate->getCode();
 				
-				$collectedFiles[$model . '.' . $this->opt->getModelFileNameExtension()] = $this->getTemplate("ModelTemplate.txt", $templateVars);
+				$this->makeFile($model . '.' . $this->opt->getModelFileNameExtension(), $this->getTemplate("ModelTemplate.txt", $templateVars));
 			}
 		}
-		//actually collect files
-		Dir::flushExcept($installPath, [$this->getShortcutTraitFileName(), 'dummy.txt']);
-		$madeFiles = [];
-		foreach ($collectedFiles as $file => $content)
-		{
-			$madeFiles[] = $this->makeFile($installPath . $file, $content);
-		}
-		
-		return $madeFiles;
 	}
 	
 	/**
