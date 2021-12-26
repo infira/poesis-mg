@@ -66,7 +66,7 @@ class ModelTemplate extends ClassTemplate
 			$method->setPublic();
 			$method->setReturnType('self');
 			
-			$paramName = Utils::fixName($column['types'][0]);
+			$paramName = Utils::fixVarName($column['types'][0]);
 			
 			$method->addParameter($paramName);//->setType(join('|', $column['types']));
 			$method->addBodyLine('return $this->add(\'' . $columnName . '\', $' . $paramName . ')');

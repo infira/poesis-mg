@@ -35,7 +35,12 @@ class Utils
 	
 	public static function fixClassName(string $name): string
 	{
-		return ucfirst(self::fixName($name));
+		return self::fixNumericName(ucfirst(self::fixName($name)));
+	}
+	
+	public static function fixVarName(string $name): string
+	{
+		return self::fixNumericName(self::fixName($name));
 	}
 	
 	public static function fixMethodName(string $name): string
@@ -46,10 +51,10 @@ class Utils
 			$studly = lcfirst($studly);
 		}
 		
-		return $studly;
+		return self::fixNumericName($studly);
 	}
 	
-	public static function fixName(string $name): string
+	private static function fixName(string $name): string
 	{
 		$name = Str::ascii($name, 'en');
 		
@@ -60,8 +65,11 @@ class Utils
 		// Replace all separator characters and whitespace by a single separator
 		$name = preg_replace('![_\s]+!u', '_', $name);
 		
-		$name = trim($name, '_');
-		
+		return trim($name, '_');
+	}
+	
+	private static function fixNumericName(string $name): string
+	{
 		if (is_numeric($name[0])) {
 			$name = "_$name";
 		}
