@@ -132,9 +132,9 @@ class Options extends Config
 		$this->setModelConfig($model, 'extender', $extender);
 	}
 	
-	public function getModelExtender(string $table): ?string
+	public function getModelExtender(string $table): string
 	{
-		return $this->getModelConfig($table)['extender'];
+		return $this->getModelConfig($table)['extender'] ?? '\Infira\Poesis\orm\Model';
 	}
 	
 	public function addModelTrait(string $model, string $trait)
@@ -185,7 +185,7 @@ class Options extends Config
 	
 	public function getDataMethodsClass(string $model): ?string
 	{
-		return $this->getDataMethodsConfig($model)['class'];
+		return $this->getDataMethodsConfig($model)['class'] ?? '\Infira\Poesis\dr\DataMethods';
 	}
 	
 	public function setDataMethodsClass(string $model, string $extender)
@@ -205,7 +205,7 @@ class Options extends Config
 	
 	public function getNodeExtender(string $model): ?string
 	{
-		return $this->getModelNodeConfig($model)['extender'];
+		return $this->getModelNodeConfig($model)['extender'] ?? '\Infira\Poesis\orm\Node';
 	}
 	
 	public function getMakeNode(string $model): bool

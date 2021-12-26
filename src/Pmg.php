@@ -16,6 +16,7 @@ use Infira\pmg\templates\SchemaTemplate;
 use Infira\pmg\templates\ModelTemplate;
 use Infira\pmg\templates\ModelShortcutTemplate;
 use Nette\PhpGenerator\PhpFile;
+use Nette\PhpGenerator\PhpNamespace;
 use Infira\pmg\templates\Utils;
 use Infira\pmg\templates\DataMethods;
 
@@ -175,50 +176,51 @@ class Pmg extends Command
 			}
 			
 			foreach ($tablesData as $tableName => $Table) {
-				$model = Utils::fixClassName($this->opt->getModelClassNamePrefix() . $tableName);
+				$modelName = Utils::fixClassName($this->opt->getModelClassNamePrefix() . $tableName);
 				
 				$templateVars                   = [];
 				$templateVars["tableName"]      = $tableName;
-				$templateVars["className"]      = $model;
+				$templateVars["className"]      = $modelName;
 				$templateVars["nodeProperties"] = '';
 				
-				$modelFullName = $this->constructFullName($model);
-				$schemaFull    = $this->constructFullName($model . 'Schema');
 				
-				$modelFile       = new PhpFile();
-				$modelClassType  = $modelFile->addClass($modelFullName);
-				$schemaClassType = $modelFile->addClass($schemaFull);
-				$modelFile->addUse('\Infira\Poesis\Poesis');
-				$modelFile->addUse('\Infira\Poesis\orm\node\Field');
-				
-				$schemaTemplate                = new SchemaTemplate($schemaClassType, $modelFile);
-				$schemaTemplate->modelName     = $model;
-				$schemaTemplate->tableName     = $tableName;
-				$schemaTemplate->modelFullPath = '\\' . $modelFullName;//TODO Misk seda vaja on?
+				$modelFile = $phpModel = new PhpFile();
+				if ($this->opt->getNamespace()) {
+					$phpModel = $modelFile->addNamespace($this->opt->getNamespace());
+				}
 				
 				
-				$modelTemplate            = new ModelTemplate($modelClassType, $modelFile);
+				$modelClassType  = $phpModel->addClass($modelName);
+				$schemaClassType = $phpModel->addClass($modelName . 'Schema');
+				$phpModel->addUse('\Infira\Poesis\Poesis');
+				$phpModel->addUse('\Infira\Poesis\orm\node\Field');
+				
+				$schemaTemplate            = new SchemaTemplate($schemaClassType, $phpModel);
+				$schemaTemplate->modelName = $modelName;
+				$schemaTemplate->tableName = $tableName;
+				
+				
+				$modelTemplate            = new ModelTemplate($modelClassType, $phpModel);
 				$modelTemplate->tableName = $tableName;
-				$modelTemplate->name      = $model;
+				$modelTemplate->name      = $modelName;
+				$modelTemplate->setModelExtender($this->opt->getModelExtender($modelName));
 				
 				$schemaTemplate->isView = $Table->Table_type == "VIEW";
-				$TIDColumnName          = $this->opt->getTIDColumnName($model);
+				$TIDColumnName          = $this->opt->getTIDColumnName($modelName);
 				if ($TIDColumnName !== null and isset($Table->columns[$TIDColumnName])) {
 					$schemaTemplate->TIDColumn = $TIDColumnName;
 				}
 				
-				$modelTemplate->setTraits($this->opt->getModelTraits($model));
+				$modelTemplate->setTraits($this->opt->getModelTraits($modelName));
 				
 				if ($result = $this->db->query("SHOW INDEX FROM `$tableName` WHERE Key_name = 'PRIMARY'")) {
 					while ($Index = $result->fetch_object()) {
 						$schemaTemplate->addPrimaryColumn($Index->Column_name);
 					}
 				}
-				if ($mc = $this->opt->getModelExtender($model)) {
-					$modelTemplate->setModelClass($mc);
-				}
 				
-				$this->shortcut->addModel($model);
+				
+				$this->shortcut->addModel($modelName);
 				
 				foreach ($Table->columns as $Column) {
 					$columnName      = $Column['Field'];
@@ -310,19 +312,19 @@ class Pmg extends Command
 				}
 				
 				
-				$modelTemplate->addImports($this->opt->getModelImports($model));
+				$modelTemplate->addImports($this->opt->getModelImports($modelName));
 				
-				if ($cc = $this->opt->getColumnClass($model)) {
+				if ($cc = $this->opt->getColumnClass($modelName)) {
 					$modelTemplate->setColumnClass($cc);
 				}
-				$modelTemplate->loggerEnabled              = $this->opt->isModelLogEnabled($model);
-				$modelTemplate->modelDefaultConnectionName = $this->opt->getModelConnectionName($model);
-				$this->makeExtras($modelFile, $modelTemplate, $model);
+				$modelTemplate->loggerEnabled              = $this->opt->isModelLogEnabled($modelName);
+				$modelTemplate->modelDefaultConnectionName = $this->opt->getModelConnectionName($modelName);
+				$this->makeExtras($phpModel, $modelTemplate, $modelName);
 				
 				$modelTemplate->finalise();
 				$schemaTemplate->finalise();
 				
-				$this->makeFile($model . '.' . $this->opt->getModelFileNameExtension(), $modelFile->__toString());
+				$this->makeFile($modelName . '.' . $this->opt->getModelFileNameExtension(), $modelFile->__toString());
 			}
 		}
 	}
@@ -338,40 +340,28 @@ class Pmg extends Command
 		$this->madeFiles[] = $file;
 	}
 	
-	private function makeExtras(PhpFile &$phpFile, ModelTemplate &$model, string $modelName)
+	/**
+	 * @param PhpNamespace|PhpFile $phpModel
+	 * @param ModelTemplate        $model
+	 * @param string               $modelName
+	 * @return void
+	 */
+	private function makeExtras(&$phpModel, ModelTemplate &$model, string $modelName)
 	{
-		$existingDataMethodsClass = $this->opt->getDataMethodsClass($modelName);
-		$defaultDataMethodsClass  = '\Infira\Poesis\dr\DataMethods';
-		
-		if (!$this->opt->getMakeNode($modelName) and $existingDataMethodsClass) {
-			$model->setDataMethodsClass($existingDataMethodsClass);
-		}
-		
-		if (!$this->opt->getMakeNode($modelName) and !$existingDataMethodsClass) {
+		if (!$this->opt->getMakeNode($modelName)) {
 			return;
 		}
-		$nodeDataMethodsFullName = $this->constructFullName($modelName . "NodeDataMethods");
-		$dmClassType             = $phpFile->addClass($nodeDataMethodsFullName);
-		$dataMethods             = new DataMethods($dmClassType, $phpFile);
-		if ($existingDataMethodsClass) {
-			
-			$model->setDataMethodsClass($nodeDataMethodsFullName, true);
-			$dataMethods->setExtends($existingDataMethodsClass);
-		}
-		else {
-			$model->setDataMethodsClass($nodeDataMethodsFullName, false);
-			$dataMethods->setExtends($defaultDataMethodsClass);
-		}
+		
+		$nodeDataMethodsName     = Utils::fixClassName($modelName . "NodeDataMethods");
+		$nodeDataMethodsFullName = $this->constructFullName($nodeDataMethodsName);
+		$dmClassType             = $phpModel->addClass($nodeDataMethodsName);
+		$dataMethods             = new DataMethods($dmClassType, $phpModel);
+		$model->setDataMethodsClass($nodeDataMethodsFullName);
+		$dataMethods->setExtends($this->opt->getDataMethodsClass($modelName));
 		
 		
 		$nodeExtender = $this->opt->getNodeExtender($modelName);
-		if ($nodeExtender) {
-			$nodeExtender = $this->constructFullName($nodeExtender);
-		}
-		else {
-			$nodeExtender = '\Infira\Poesis\orm\Node';
-		}
-		$phpFile->addUse($nodeExtender, 'Node');
+		$phpModel->addUse($nodeExtender, 'Node');
 		
 		$dataMethods->setTraits($this->opt->getDataMethodsTraits($modelName));
 		

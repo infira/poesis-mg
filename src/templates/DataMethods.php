@@ -4,13 +4,12 @@ namespace Infira\pmg\templates;
 
 
 use Nette\PhpGenerator\ClassType;
-use Nette\PhpGenerator\PhpFile;
 
 class DataMethods extends ClassTemplate
 {
-	public function __construct(ClassType $class, PhpFile $phpFile)
+	public function __construct(ClassType $class, object $phpNamespace)
 	{
-		parent::__construct($class, $phpFile);
+		parent::__construct($class, $phpNamespace);
 	}
 	
 	public function beforeFinalize() {}

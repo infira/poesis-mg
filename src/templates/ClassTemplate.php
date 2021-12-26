@@ -27,14 +27,14 @@ abstract class ClassTemplate extends Magics
 	private $ns = null;
 	
 	/**
-	 * @var PhpFile
+	 * @var PhpFile|PhpNamespace
 	 */
-	private $pf = null;
+	private $phpf = null;
 	
-	public function __construct(ClassType $class, PhpFile $phpFile, ?string $namespace = '')
+	public function __construct(ClassType $class, object $phpNamespace)
 	{
 		$this->class = &$class;
-		$this->pf    = &$phpFile;
+		$this->phpf  = &$phpNamespace;
 		$this->setMagicVar('class');
 	}
 	
@@ -66,7 +66,7 @@ abstract class ClassTemplate extends Magics
 	
 	public function import(string $name, ?string $alias = null)
 	{
-		$this->pf->addUse($name, $alias);
+		$this->phpf->addUse($name, $alias);
 	}
 	
 	public function setClassVariable(string $varName, bool $setUse, string $class, string $alias = null): void
@@ -86,13 +86,5 @@ abstract class ClassTemplate extends Magics
 		$this->import(join('\\', $ex), $alias);
 		
 		return $alias ?: end($ex);
-	}
-	
-	public function setExtender(string $class, string $alias = null): self
-	{
-		$this->addImportFromString($class, $alias);
-		$this->class->setExtends($class);
-		
-		return $this;
 	}
 }

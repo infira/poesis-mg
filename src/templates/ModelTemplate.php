@@ -4,7 +4,6 @@ namespace Infira\pmg\templates;
 
 
 use Nette\PhpGenerator\ClassType;
-use Nette\PhpGenerator\PhpFile;
 
 class ModelTemplate extends ClassTemplate
 {
@@ -15,7 +14,6 @@ class ModelTemplate extends ClassTemplate
 	
 	protected $dataMethodsClass           = '';
 	protected $columnClass                = '';
-	protected $modelClass                 = '';
 	public    $tableName                  = '';
 	public    $name                       = '';
 	public    $modelDefaultConnectionName = '';
@@ -23,9 +21,9 @@ class ModelTemplate extends ClassTemplate
 	
 	private $columns = [];
 	
-	public function __construct(ClassType $class, PhpFile $phpFile)
+	public function __construct(ClassType $class, object $phpNamespace)
 	{
-		parent::__construct($class, $phpFile);
+		parent::__construct($class, $phpNamespace);
 		$this->constructor = $this->createMethod('__construct');
 	}
 	
@@ -34,13 +32,10 @@ class ModelTemplate extends ClassTemplate
 		if (!$this->dataMethodsClass) {
 			$this->setDataMethodsClass('\Infira\Poesis\dr\DataMethods');
 		}
-		if (!$this->modelClass) {
-			$this->setModelClass('\Infira\Poesis\orm\Model');
-		}
+		
 		if (!$this->columnClass) {
 			$this->setColumnClass('\Infira\Poesis\orm\ModelColumn');
 		}
-		$this->setExtends($this->modelClass);
 		
 		$select = $this->createMethod('select');
 		$select->addParameter('columns')
@@ -84,9 +79,9 @@ class ModelTemplate extends ClassTemplate
 		}
 	}
 	
-	public function setDataMethodsClass(string $dataMethodsClass, bool $setUse = true): void
+	public function setDataMethodsClass(string $dataMethodsClass): void
 	{
-		$this->setClassVariable('dataMethodsClass', $setUse, $dataMethodsClass, 'DataMethods');
+		$this->setClassVariable('dataMethodsClass', true, $dataMethodsClass, 'DataMethods');
 	}
 	
 	public function setColumnClass(string $columnClass, bool $setUse = true): void
@@ -94,9 +89,10 @@ class ModelTemplate extends ClassTemplate
 		$this->setClassVariable('columnClass', $setUse, $columnClass, 'ModelColumn');
 	}
 	
-	public function setModelClass(string $modelClass, bool $setUse = true): void
+	public function setModelExtender(string $class)
 	{
-		$this->setClassVariable('modelClass', $setUse, $modelClass, 'Model');
+		$this->import($class, 'Model');
+		$this->class->setExtends($class);
 	}
 	
 	public function setColumn(string $columnName, array $column)

@@ -4,7 +4,6 @@ namespace Infira\pmg\templates;
 
 
 use Nette\PhpGenerator\ClassType;
-use Nette\PhpGenerator\PhpFile;
 
 class SchemaTemplate extends ClassTemplate
 {
@@ -13,7 +12,6 @@ class SchemaTemplate extends ClassTemplate
 	 */
 	public $constructor;
 	
-	public $modelFullPath = '';
 	public $tableName     = '';
 	public $modelName     = '';
 	public $aiColumn      = null;
@@ -24,9 +22,9 @@ class SchemaTemplate extends ClassTemplate
 	private $primaryColumns = [];
 	
 	
-	public function __construct(ClassType $class, PhpFile $phpFile)
+	public function __construct(ClassType $class, object $phpNamespace)
 	{
-		parent::__construct($class, $phpFile);
+		parent::__construct($class, $phpNamespace);
 		$this->constructor = $this->createMethod('construct');
 		$this->constructor->setStatic();
 		$this->class->addTrait('\Infira\Poesis\orm\Schema');
