@@ -62,11 +62,11 @@ class ModelTemplate extends ClassTemplate
 			$desc = $column['Type'] . ((isset($column["Comment"]) and strlen($column["Comment"]) > 0) ? ' - ' . $column["Comment"] : '');
 			$this->addComment('@property ModelColumn $' . $columnName . ' ' . $desc);
 			
-			$method = $this->createMethod(Utils::fixClassVarName($columnName));
+			$method = $this->createMethod(Utils::fixMethodName($columnName));
 			$method->setPublic();
 			$method->setReturnType('self');
 			
-			$paramName = Utils::fixClassVarName($column['types'][0]);
+			$paramName = Utils::fixName($column['types'][0]);
 			
 			$method->addParameter($paramName);//->setType(join('|', $column['types']));
 			$method->addBodyLine('return $this->add(\'' . $columnName . '\', $' . $paramName . ')');

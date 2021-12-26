@@ -301,7 +301,7 @@ class Pmg extends Command
 				});
 				foreach ($indexMethods as $indexName => $columns) {
 					$columnComment = [];
-					$method        = $modelTemplate->createMethod(Utils::fixClassVarName($indexName) . '_index');
+					$method        = $modelTemplate->createMethod(Utils::fixMethodName($indexName) . '_index');
 					foreach ($columns as $Col) {
 						$columnComment[] = $Col->Column_name;
 						$method->addParameter($Col->Column_name);

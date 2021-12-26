@@ -33,48 +33,40 @@ class Utils
 		return [$valueFormat, $value];
 	}
 	
-	public static function fixClassVarName(string $name): string
+	public static function fixClassName(string $name): string
 	{
-		$name = lcfirst(Str::camel(self::slug($name, '_')));
+		return ucfirst(self::fixName($name));
+	}
+	
+	public static function fixMethodName(string $name): string
+	{
+		$name   = self::fixName($name);
+		$studly = Str::studly($name);
+		if ($name[0] !== $studly[0]) {
+			$studly = lcfirst($studly);
+		}
+		
+		return $studly;
+	}
+	
+	public static function fixName(string $name): string
+	{
+		$name = Str::ascii($name, 'en');
+		
+		$name = preg_replace('![-]+!u', '_', $name);
+		// Remove all characters that are not the separator, letters, numbers, or whitespace.
+		$name = preg_replace('![^_\pL\pN\s]+!u', '', $name);
+		
+		// Replace all separator characters and whitespace by a single separator
+		$name = preg_replace('![_\s]+!u', '_', $name);
+		
+		$name = trim($name, '_');
+		
 		if (is_numeric($name[0])) {
 			$name = "_$name";
 		}
 		
 		return $name;
-	}
-	
-	public static function fixClassName(string $name): string
-	{
-		return ucfirst(self::fixClassVarName($name));
-	}
-	
-	/**
-	 * Same as Str::slug but without converting to lowecase
-	 *
-	 * @param $title
-	 * @param $separator
-	 * @param $language
-	 * @return string
-	 */
-	public static function slug($title, $separator = '-', $language = 'en'): string
-	{
-		$title = $language ? Str::ascii($title, $language) : $title;
-		
-		// Convert all dashes/underscores into separator
-		$flip = $separator === '-' ? '_' : '-';
-		
-		$title = preg_replace('![' . preg_quote($flip) . ']+!u', $separator, $title);
-		
-		// Replace @ with the word 'at'
-		$title = str_replace('@', $separator . 'at' . $separator, $title);
-		
-		// Remove all characters that are not the separator, letters, numbers, or whitespace.
-		$title = preg_replace('![^' . preg_quote($separator) . '\pL\pN\s]+!u', '', $title);
-		
-		// Replace all separator characters and whitespace by a single separator
-		$title = preg_replace('![' . preg_quote($separator) . '\s]+!u', $separator, $title);
-		
-		return trim($title, $separator);
 	}
 	
 }
