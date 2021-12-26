@@ -7,7 +7,7 @@ use Nette\PhpGenerator\Method;
 /**
  * @mixin Method
  */
-class MethodTemplate extends Template
+class MethodTemplate extends Magics
 {
 	/**
 	 * @var \Nette\PhpGenerator\Method
@@ -16,9 +16,10 @@ class MethodTemplate extends Template
 	private   $lines           = [];
 	private   $eqLineSetMaxLen = 0;
 	
-	public function __construct(string $name)
+	public function __construct(Method $method)
 	{
-		parent::__construct(new Method($name), 'method');
+		$this->method = &$method;
+		$this->setMagicVar('method');
 	}
 	
 	public function addEqBodyLine(string $set, $value, $valueFormat = null)
@@ -26,7 +27,7 @@ class MethodTemplate extends Template
 		$this->eqLineSetMaxLen = max($this->eqLineSetMaxLen, strlen($set));
 		if (!$valueFormat)
 		{
-			$parsed      = $this->parseValueFormat($value, $valueFormat);
+			$parsed      = Utils::parseValueFormat($value, $valueFormat);
 			$value       = $parsed[1];
 			$valueFormat = $parsed[0];
 		}

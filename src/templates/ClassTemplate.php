@@ -4,11 +4,12 @@ namespace Infira\pmg\templates;
 
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\PhpNamespace;
+use Nette\PhpGenerator\PhpFile;
 
 /**
  * @mixin ClassType
  */
-abstract class ClassTemplate extends Template
+abstract class ClassTemplate extends Magics
 {
 	/**
 	 * @var ClassType
@@ -25,37 +26,34 @@ abstract class ClassTemplate extends Template
 	 */
 	private $ns = null;
 	
-	public function __construct(string $type, string $name, ?string $namespace = '')
+	/**
+	 * @var PhpFile
+	 */
+	private $pf = null;
+	
+	public function __construct(ClassType $class, PhpFile $phpFile, ?string $namespace = '')
 	{
-		parent::__construct(ClassType::$type($name), 'class');
-		$this->ns = new PhpNamespace($namespace);
+		$this->class = &$class;
+		$this->pf    = &$phpFile;
+		$this->setMagicVar('class');
 	}
 	
-	public function getCode(): string
+	public function finalise()
 	{
-		$this->beforeGetCode();
+		$this->beforeFinalize();
 		array_walk($this->methods, function (&$method)
 		{
 			$method = $method->construct();
 		});
 		$this->class->setMethods($this->methods);
+		$this->addComment('');
 		$this->addComment('@author https://github.com/infira/poesis-mg');
-		
-		$printable = $this->class;
-		if ($this->ns !== null)
-		{
-			$this->ns->add($this->class);
-			//$this->ns->addClass($this->class->getName());
-			
-			$printable = $this->ns;
-		}
-		
-		return $printable->__toString();
 	}
 	
 	public function createMethod(string $name)
 	{
-		$method          = new MethodTemplate($name);
+		$method          = $this->addMethod($name);
+		$method          = new MethodTemplate($method);
 		$this->methods[] = &$method;
 		
 		return $method;
@@ -68,25 +66,20 @@ abstract class ClassTemplate extends Template
 	
 	public function import(string $name, ?string $alias = null)
 	{
-		$this->ns->addUse($name, $alias);
+		$this->pf->addUse($name, $alias);
 	}
 	
-	public function addTraits(array $imports)
+	public function setClassVariable(string $varName, bool $setUse, string $class, string $alias = null): void
 	{
-		array_walk($imports, [$this, 'addTrait']);
-	}
-	
-	
-	public function setClassVariable(string $varName, string $class, string $alias = null): void
-	{
-		$class          = $this->addImportFromString($class, $alias);
-		$this->$varName = "CLEAN=$class::CLASS";
+		if ($setUse) {
+			$class = $this->addImportFromString($class, $alias);
+		}
+		$this->$varName = $class;
 	}
 	
 	private function addImportFromString(string $class, string $alias = null): string
 	{
-		if ($class[0] == '\\')
-		{
+		if ($class[0] == '\\') {
 			$class = substr($class, 1);
 		}
 		$ex = explode('\\', $class);
@@ -97,12 +90,9 @@ abstract class ClassTemplate extends Template
 	
 	public function setExtender(string $class, string $alias = null): self
 	{
-		//$this->class->setExtends($this->addImportFromString($class));
 		$this->addImportFromString($class, $alias);
 		$this->class->setExtends($class);
 		
 		return $this;
 	}
-	
-	abstract public function beforeGetCode();
 }

@@ -1,39 +1,38 @@
 connection:
-  host: null
-  user: null
-  pass: null
-  db: null
+  host: 192.168.33.10
+  port: 3306
+  user: vagrant
+  pass: parool
+  db: poesis
 
-namespace : null
 destinationPath: /Users/gentaliaru/ws/git/gitHubInfira/poesis-mg/tmp/models
-extensionsPath: null
+extensionsPath: /Users/gentaliaru/ws/git/gitHubInfira/poesis-mg/tmp/extensions
+namespace: PoeisisORMTest
 voidTables : []
 
-
 model:
-  extender: \Infira\Poesis\orm\Model
-  prefix : ''
+  extender: null
+  prefix: ''
   fileExt: php
-  connectionName: defaultPoesisDbConnection
+  connectionName: defaultConnection
   traits: [ ]
   imports: [ ]
-  log : true
-  dataMethodsClass: \Infira\Poesis\dr\DataMethods
-  dataMethodsClassTraits: []
-  makeNode: false
-  node:
-    className: "%model%Node"
-    extender: \Infira\Poesis\orm\Node
-    createNodeConstructorParams: ["a","b"]
+  log: true
+  #can be null
+  dataMethods:
+    class: null
     traits: [ ]
-    imports: [ ]
-  columnClass: \Infira\Poesis\orm\ModelColumn
-
-  TIDEnabled: false
-  TIDColumName: TID
+    #can be null
+    node:
+      extender: null
+      traits: [ ]
+  #can be null
+  columnClass: null
+  TIDColumName: null
 
 
 modelShortcut:
   name: PoesisModelShortcut
-  fileExt: 'trait.php'
+  fileExt: 'php'
   imports: [ ]
+

@@ -12,12 +12,12 @@ class Db
 	/**
 	 * @var \mysqli
 	 */
-	private mysqli $mysqli;
+	private $mysqli;
 	
 	public        $dbName = false;
-	public string $name;
+	public $name;
 	
-	private stdClass $lastQueryInfo;
+	private $lastQueryInfo;
 	
 	/**
 	 * Connect using mysqli

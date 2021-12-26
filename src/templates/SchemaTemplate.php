@@ -3,6 +3,9 @@
 namespace Infira\pmg\templates;
 
 
+use Nette\PhpGenerator\ClassType;
+use Nette\PhpGenerator\PhpFile;
+
 class SchemaTemplate extends ClassTemplate
 {
 	/**
@@ -10,30 +13,30 @@ class SchemaTemplate extends ClassTemplate
 	 */
 	public $constructor;
 	
-	public $createModelClassName = '';
-	public $tableName            = '';
-	public $modelName            = '';
-	public $aiColumn             = null;
-	public $TIDColumn            = null;
-	public $isView               = null;
+	public $modelFullPath = '';
+	public $tableName     = '';
+	public $modelName     = '';
+	public $aiColumn      = null;
+	public $TIDColumn     = null;
+	public $isView        = null;
 	
 	private $columns        = [];
 	private $primaryColumns = [];
 	
 	
-	public function __construct(string $name)
+	public function __construct(ClassType $class, PhpFile $phpFile)
 	{
-		parent::__construct('class', $name . 'Schema');
+		parent::__construct($class, $phpFile);
 		$this->constructor = $this->createMethod('construct');
 		$this->constructor->setStatic();
 		$this->class->addTrait('\Infira\Poesis\orm\Schema');
 	}
 	
-	public function beforeGetCode()
+	public function beforeFinalize()
 	{
 		$this->constructor->addEqBodyLine('self::$tableName', $this->tableName);
 		$this->constructor->addEqBodyLine('self::$modelName', $this->modelName);
-		$this->constructor->addEqBodyLine('self::$newModelName', $this->createModelClassName);
+		$this->constructor->addEqBodyLine('self::$modelClass', "CLEAN=$this->modelName::class");
 		$this->constructor->addEqBodyLine('self::$columns', $this->columns);
 		$this->constructor->addEqBodyLine('self::$primaryColumns', $this->primaryColumns);
 		$this->constructor->addEqBodyLine('self::$aiColumn', $this->aiColumn);
@@ -56,9 +59,8 @@ class SchemaTemplate extends ClassTemplate
 		$structure['allowedValues'] = $allowedValues;
 		$structure['isNull']        = $isNull;
 		$structure['isAI']          = $isAi;
-		foreach ($structure as $name => $value)
-		{
-			$structure[$name] = "'$name'=>" . sprintf(...$this->parseValueFormat($value));
+		foreach ($structure as $name => $value) {
+			$structure[$name] = "'$name'=>" . sprintf(...Utils::parseValueFormat($value));
 		}
 		$this->constructor->addEqBodyLine('self::$columnStructure[\'' . $column . '\']', $structure);
 	}

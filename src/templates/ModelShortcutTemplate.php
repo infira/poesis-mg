@@ -4,11 +4,20 @@ namespace Infira\pmg\templates;
 
 class ModelShortcutTemplate extends ClassTemplate
 {
-	public function __construct(string $name, ?string $namespace = '')
+	public function beforeFinalize()
 	{
-		parent::__construct('trait', $name, $namespace);
 		$this->class->addComment('This class provides quick shortcuts to database table model classes');
 	}
 	
-	public function beforeGetCode() { }
+	public function addModel(string $model)
+	{
+		$shortcutMethod = $this->createMethod(Utils::fixClassName($model));
+		$shortcutMethod->setStatic(true);
+		$shortcutMethod->addParameter('options')->setType('array')->setDefaultValue([]);
+		$shortcutMethod->setReturnType($model);
+		$shortcutMethod->addBodyLine('return new ' . $model . '($options)');
+		$shortcutMethod->addComment('Method to return ' . $model . ' class');
+		$shortcutMethod->addComment('@param array $options = []');
+		$shortcutMethod->addComment('@return ' . $model);
+	}
 }

@@ -2,21 +2,20 @@
 
 namespace Infira\pmg\templates;
 
-abstract class Template
+abstract class Magics
 {
 	private $magicVar;
-	
-	public function __construct(object &$mixer, string $varName)
-	{
-		$this->magicVar = $varName;
-		$this->$varName = $mixer;
-	}
 	
 	public function __call($name, $arguments)
 	{
 		$var = $this->magicVar;
 		
 		return $this->$var->$name(...$arguments);
+	}
+	
+	public final function setMagicVar(string $var)
+	{
+		$this->magicVar = $var;
 	}
 	
 }

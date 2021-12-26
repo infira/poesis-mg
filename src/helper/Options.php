@@ -8,7 +8,6 @@ use Infira\Utils\Regex;
 use Infira\Utils\File;
 use stdClass;
 use Exception;
-use Infira\Utils\Variable;
 use Infira\console\helper\Config;
 use Infira\console\Bin;
 
@@ -20,29 +19,29 @@ class Options extends Config
 		$this->mergeConfig($yamlPath);
 	}
 	
+	private function checkModel(string $model)
+	{
+		if (!isset($this->config['models'][$model])) {
+			$this->set("models.$model", $this->config['model']);
+		}
+	}
+	
 	private function setModelConfig(string $model, string $config, $configValue)
 	{
+		$this->checkModel($model);
 		$this->set("models.$model.$config", $configValue);
 	}
 	
 	private function addToModelConfig(string $model, string $config, $configValue)
 	{
-		$path = "models.$model.$config";
-		if (!$this->exists($path))
-		{
-			$this->setModelConfig($model, $config, $this->config['model'][$config]);
-		}
-		$this->add($path, $configValue);
+		$this->checkModel($model);
+		$this->add("models.$model.$config", $configValue);
 	}
 	
 	private function getModelConfig(string $model): array
 	{
-		if (!isset($this->config['models'][$model]))
-		{
-			return $this->config['model'];
-		}
-		
-		return array_merge($this->config['model'], $this->config['models'][$model]);
+		$this->checkModel($model);
+		return $this->config['models'][$model];
 	}
 	
 	public function isTableVoided(string $table): bool
@@ -53,39 +52,25 @@ class Options extends Config
 	public function scanExtensions()
 	{
 		$path = $this->getExtensionsPath();
-		if ($path === null)
-		{
+		if ($path === null) {
 			return;
 		}
-		if (!is_dir($path))
-		{
+		if (!is_dir($path)) {
 			throw new Exception("scan model extensions folder must be correct path($path)");
 		}
-		foreach (Dir::getFileNames($path) as $fn)
-		{
+		foreach (Dir::getFileNames($path) as $fn) {
 			$file = Dir::fixPath($path) . $fn;
-			if ($dm = $this->findFileExtension($file, 'Model'))
-			{
-				$this->setModelExtender($dm->model, $dm->extension);
+			if ($dm = $this->findFileExtension($file, 'Model')) {
+				$this->setModelExtender($dm->model, $dm->name);
 			}
-			elseif ($dm = $this->findFileExtension($file, 'Trait'))
-			{
-				$this->addModelTrait($dm->model, $dm->extension);
+			elseif ($dm = $this->findFileExtension($file, 'Trait')) {
+				$this->addModelTrait($dm->model, $dm->name);
 			}
-			elseif ($dm = $this->findFileExtension($file, 'DataMethods'))
-			{
-				$this->setModelDataMethodsClass($dm->model, $dm->extension);
+			elseif ($dm = $this->findFileExtension($file, 'DataMethods')) {
+				$this->setDataMethodsClass($dm->model, $dm->name);
 			}
-			elseif ($dm = $this->findFileExtension($file, 'Node'))
-			{
-				$this->setModelNodeExtendor($dm->model, $dm->extension);
-			}
-			if (isset($dm))
-			{
-				foreach ($dm->imports as $import)
-				{
-					$this->addModelImport($dm->model, $import);
-				}
+			elseif ($dm = $this->findFileExtension($file, 'Node')) {
+				$this->setModelNodeExtendor($dm->model, $dm->name);
 			}
 		}
 	}
@@ -95,28 +80,20 @@ class Options extends Config
 		$pi       = (object)pathinfo($file);
 		$fileName = $pi->filename;
 		
-		$len       = strlen($type) * -1;
-		$extension = $fileName;
-		if (substr($fileName, $len) == $type)
-		{
-			$model       = substr($fileName, 0, $len);
-			$fileContent = File::getContent($file);
-			$imports     = [];
-			if (Regex::isMatch('/namespace (.+)?;/m', $fileContent))
-			{
-				$matches = [];
-				preg_match_all('/namespace (.+)?;/m', $fileContent, $matches);
-				$imports[] = '\\' . $matches[1][0] . '\\' . $extension;
-			}
-			else
-			{
-				$extension = '\\' . $extension;
-			}
-			
-			return (object)['model' => $model, 'extension' => $extension, 'imports' => $imports];
+		if (!preg_match('/(.+)(' . $type . '.*)/m', $fileName, $matches)) {
+			return null;
+		}
+		$model = $matches[1];
+		$name  = '\\' . $matches[0];
+		
+		$fileContent = File::getContent($file);
+		if (Regex::isMatch('/namespace (.+)?;/m', $fileContent)) {
+			$matches = [];
+			preg_match_all('/namespace (.+)?;/m', $fileContent, $matches);
+			$name = '\\' . $matches[1][0] . $name;
 		}
 		
-		return null;
+		return (object)['model' => $model, 'name' => $name];
 	}
 	
 	public function getNamespace(): ?string
@@ -134,14 +111,22 @@ class Options extends Config
 		return $this->config['extensionsPath'];
 	}
 	
-	//region model options
+	public function setExtensionsPath(string $path)
+	{
+		$this->config['extensionsPath'] = $path;
+	}
+	
+	public function getColumnClass(string $model): ?string
+	{
+		return $this->getModelConfig($model)['columnClass'];
+	}
 	
 	public function setModelExtender(string $model, string $extender)
 	{
-		$this->set("models.$model.extender", $extender);
+		$this->setModelConfig($model, 'extender', $extender);
 	}
 	
-	public function getModelExtender(string $table): string
+	public function getModelExtender(string $table): ?string
 	{
 		return $this->getModelConfig($table)['extender'];
 	}
@@ -154,11 +139,6 @@ class Options extends Config
 	public function getModelTraits(string $model): array
 	{
 		return $this->getModelConfig($model)['traits'];
-	}
-	
-	public function addModelImport(string $model, string $import)
-	{
-		$this->addToModelConfig($model, 'imports', $import);
 	}
 	
 	public function getModelImports(string $model): array
@@ -181,12 +161,7 @@ class Options extends Config
 		return $this->getModelConfig($model)['connectionName'];
 	}
 	
-	public function isModelTIDEnabled(string $model): bool
-	{
-		return $this->getModelConfig($model)['TIDEnabled'];
-	}
-	
-	public function getModelTIDColumnName(string $model): string
+	public function getTIDColumnName(string $model): ?string
 	{
 		return $this->getModelConfig($model)['TIDColumName'];
 	}
@@ -196,59 +171,44 @@ class Options extends Config
 		return $this->getModelConfig($model)['log'];
 	}
 	
-	public function getModelDataMethodsClass(string $model): string
+	//region data methods
+	private function getDataMethodsConfig(string $model): ?array
 	{
-		return $this->getModelConfig($model)['dataMethodsClass'];
+		return $this->getModelConfig($model)['dataMethods'];
 	}
 	
-	public function setModelDataMethodsClass(string $model, string $extender)
+	public function getDataMethodsClass(string $model): ?string
 	{
-		$this->setModelConfig($model, 'dataMethodsClass', $extender);
+		return $this->getDataMethodsConfig($model)['class'];
 	}
 	
-	public function addModelDataMethodsTrait(string $model, string $trait)
+	public function setDataMethodsClass(string $model, string $extender)
 	{
-		$this->addToModelConfig($model, 'dataMethodsClassTraits', $trait);
+		$this->setModelConfig("$model", 'dataMethods.class', $extender);
 	}
 	
-	public function getModelDataMethodsTraits(string $model): array
+	public function getDataMethodsTraits(string $model): array
 	{
-		return $this->getModelConfig($model)['dataMethodsClassTraits'];
+		return $this->getDataMethodsConfig($model)['traits'];
 	}
 	
-	public function getModelColumnClass(string $model): string
+	private function getModelNodeConfig(string $model): ?array
 	{
-		return $this->getModelConfig($model)['columnClass'];
-	}
-	//endregion
-	
-	//region node options
-	private function getModelNodeConfig(string $model): array
-	{
-		return $this->getModelConfig($model)['node'];
+		return $this->getDataMethodsConfig($model)['node'];
 	}
 	
-	public function getModelMakeNode(string $model): bool
-	{
-		return $this->getModelConfig($model)['makeNode'];
-	}
-	
-	public function getModelNodeClassName(string $model)
-	{
-		return Variable::assign(['model' => $model], $this->getModelNodeConfig($model)['className']);
-	}
-	
-	public function getModelNodeExtender(string $model): string
+	public function getNodeExtender(string $model): ?string
 	{
 		return $this->getModelNodeConfig($model)['extender'];
 	}
 	
-	public function getModelNodeTraits(string $model): array
+	public function getMakeNode(string $model): bool
 	{
-		return $this->getModelNodeConfig($model)['traits'];
+		return (bool)$this->getModelNodeConfig($model);
 	}
 	
 	//endregion
+	
 	
 	//region shortcut options
 	public function getShortcutImports(): array
