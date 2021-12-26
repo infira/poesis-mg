@@ -18,7 +18,6 @@
   ],
   "require": {
 	"infira/console": "*",
-	"illuminate/support": "8.x-dev",
     "nette/php-generator": "v3.6.x-dev"
   }
 }

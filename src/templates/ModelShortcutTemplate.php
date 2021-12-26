@@ -11,7 +11,7 @@ class ModelShortcutTemplate extends ClassTemplate
 	
 	public function addModel(string $model)
 	{
-		$shortcutMethod = $this->createMethod(Utils::fixClassName($model));
+		$shortcutMethod = $this->createMethod(Utils::className($model));
 		$shortcutMethod->setStatic(true);
 		$shortcutMethod->addParameter('options')->setType('array')->setDefaultValue([]);
 		$shortcutMethod->setReturnType($model);

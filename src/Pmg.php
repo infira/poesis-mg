@@ -136,7 +136,7 @@ class Pmg extends Command
 	
 	private function constructFullName(string $name): string
 	{
-		$name = Utils::fixClassName($name);
+		$name = Utils::className($name);
 		
 		return $this->opt->getNamespace() ? $this->opt->getNamespace() . '\\' . $name : $name;
 	}
@@ -176,7 +176,7 @@ class Pmg extends Command
 			}
 			
 			foreach ($tablesData as $tableName => $Table) {
-				$modelName = Utils::fixClassName($this->opt->getModelClassNamePrefix() . $tableName);
+				$modelName = Utils::className($this->opt->getModelClassNamePrefix() . $tableName);
 				
 				$templateVars                   = [];
 				$templateVars["tableName"]      = $tableName;
@@ -301,7 +301,7 @@ class Pmg extends Command
 				});
 				foreach ($indexMethods as $indexName => $columns) {
 					$columnComment = [];
-					$method        = $modelTemplate->createMethod(Utils::fixMethodName($indexName) . '_index');
+					$method        = $modelTemplate->createMethod(Utils::methodName($indexName) . '_index');
 					foreach ($columns as $Col) {
 						$columnComment[] = $Col->Column_name;
 						$method->addParameter($Col->Column_name);
@@ -352,7 +352,7 @@ class Pmg extends Command
 			return;
 		}
 		
-		$nodeDataMethodsName     = Utils::fixClassName($modelName . "NodeDataMethods");
+		$nodeDataMethodsName     = Utils::className($modelName . "NodeDataMethods");
 		$nodeDataMethodsFullName = $this->constructFullName($nodeDataMethodsName);
 		$dmClassType             = $phpModel->addClass($nodeDataMethodsName);
 		$dataMethods             = new DataMethods($dmClassType, $phpModel);
