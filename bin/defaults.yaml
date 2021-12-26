@@ -6,7 +6,7 @@ connection:
   db: poesis
 
 destinationPath: /Users/gentaliaru/ws/git/gitHubInfira/poesis-mg/tmp/models
-extensionsPath: /Users/gentaliaru/ws/git/gitHubInfira/poesis-mg/tmp/extensions
+extensionsPath: ./extensions
 namespace: PoeisisORMTest
 voidTables : []
 

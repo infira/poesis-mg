@@ -97,6 +97,7 @@ class Pmg extends Command
 			$this->error('create path not writable');
 		}
 		$this->destination = Dir::fixPath($destinationPath);
+		$this->opt->setDestinationPath($this->destination);
 		
 		
 		$connection   = (object)$this->opt->get('connection');
@@ -106,7 +107,15 @@ class Pmg extends Command
 		
 		
 		$shortcutFileName = $this->opt->getShortcutName() . '.' . $this->opt->getShortcutTraitFileNameExtension();
-		Dir::flushExcept($this->destination, [$shortcutFileName, 'dummy.txt']);
+		$flushExcept      = [$shortcutFileName, 'dummy.txt'];
+		if (strpos($this->opt->getExtensionsPath(), $this->opt->getDestinationPath()) !== false) {
+			$bn = str_replace($this->opt->getDestinationPath(), '', $this->opt->getExtensionsPath());
+			if (substr($bn, -1) == '/') {
+				$bn = substr($bn, 0, -1);
+			}
+			$flushExcept[] = $bn;
+		}
+		Dir::flushExcept($this->destination, $flushExcept);
 		
 		
 		$shortcutFile     = new PhpFile();

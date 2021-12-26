@@ -41,6 +41,7 @@ class Options extends Config
 	private function getModelConfig(string $model): array
 	{
 		$this->checkModel($model);
+		
 		return $this->config['models'][$model];
 	}
 	
@@ -104,6 +105,11 @@ class Options extends Config
 	public function getDestinationPath(): string
 	{
 		return $this->config['destinationPath'];
+	}
+	
+	public function setDestinationPath(string $path)
+	{
+		$this->config['destinationPath'] = $path;
 	}
 	
 	public function getExtensionsPath(): ?string
