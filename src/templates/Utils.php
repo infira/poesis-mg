@@ -35,7 +35,7 @@ class Utils
 	
 	public static function fixClassName(string $name): string
 	{
-		return self::fixNumericName(ucfirst(self::fixName($name)));
+		return self::fixNumericName(ucfirst(Str::camel(self::fixName($name))));
 	}
 	
 	public static function fixVarName(string $name): string
@@ -58,7 +58,7 @@ class Utils
 	{
 		$name = Str::ascii($name, 'en');
 		
-		$name = preg_replace('![-]+!u', '_', $name);
+		$name = preg_replace('![_]+!u', '_', $name);
 		// Remove all characters that are not the separator, letters, numbers, or whitespace.
 		$name = preg_replace('![^_\pL\pN\s]+!u', '', $name);
 		
