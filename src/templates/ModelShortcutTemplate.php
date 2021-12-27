@@ -9,12 +9,13 @@ class ModelShortcutTemplate extends ClassTemplate
 		$this->class->addComment('This class provides quick shortcuts to database table model classes');
 	}
 	
-	public function addModel(string $model)
+	public function addModel(string $modelClass)
 	{
+		$model = Utils::extractName($modelClass);
 		$shortcutMethod = $this->createMethod(Utils::className($model));
 		$shortcutMethod->setStatic(true);
 		$shortcutMethod->addParameter('options')->setType('array')->setDefaultValue([]);
-		$shortcutMethod->setReturnType($model);
+		$shortcutMethod->setReturnType($modelClass);
 		$shortcutMethod->addBodyLine('return new ' . $model . '($options)');
 		$shortcutMethod->addComment('Method to return ' . $model . ' class');
 		$shortcutMethod->addComment('@param array $options = []');

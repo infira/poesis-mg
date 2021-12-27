@@ -2,6 +2,8 @@
 
 namespace Infira\pmg\templates;
 
+use Nette\PhpGenerator\Literal;
+
 class Utils extends \Infira\console\helper\Utils
 {
 	public static function parseValueFormat($value, ?string $valueFormat = "'%s'"): array
@@ -20,14 +22,19 @@ class Utils extends \Infira\console\helper\Utils
 			$valueFormat = "[%s]";
 			$value       = join(',', $value);
 		}
-		elseif (is_string($value) and substr($value, 0, 6) == 'CLEAN=') {
-			$valueFormat = '%s';
-			$value       = substr($value, 6);
-		}
 		elseif (is_string($value) and strpos($value, 'Poesis::NONE') !== false or is_integer($value) or is_float($value)) {
 			$valueFormat = '%s';
 		}
+		elseif (is_object($value) and $value instanceof Literal) {
+			$valueFormat = '%s';
+			$value       = $value->__toString();
+		}
 		
 		return [$valueFormat, $value];
+	}
+	
+	public static function literal(string $value): Literal
+	{
+		return new Literal($value);
 	}
 }

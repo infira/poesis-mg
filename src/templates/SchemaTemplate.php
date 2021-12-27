@@ -12,11 +12,11 @@ class SchemaTemplate extends ClassTemplate
 	 */
 	public $constructor;
 	
-	public $tableName     = '';
-	public $modelName     = '';
-	public $aiColumn      = null;
-	public $TIDColumn     = null;
-	public $isView        = null;
+	public $tableName = '';
+	public $modelName = '';
+	public $aiColumn  = null;
+	public $TIDColumn = null;
+	public $isView    = null;
 	
 	private $columns        = [];
 	private $primaryColumns = [];
@@ -34,7 +34,7 @@ class SchemaTemplate extends ClassTemplate
 	{
 		$this->constructor->addEqBodyLine('self::$tableName', $this->tableName);
 		$this->constructor->addEqBodyLine('self::$modelName', $this->modelName);
-		$this->constructor->addEqBodyLine('self::$modelClass', "CLEAN=$this->modelName::class");
+		$this->constructor->addEqBodyLine('self::$modelClass', Utils::literal("$this->modelName::class"));
 		$this->constructor->addEqBodyLine('self::$columns', $this->columns);
 		$this->constructor->addEqBodyLine('self::$primaryColumns', $this->primaryColumns);
 		$this->constructor->addEqBodyLine('self::$aiColumn', $this->aiColumn);

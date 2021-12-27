@@ -220,7 +220,7 @@ class Pmg extends Command
 				}
 				
 				
-				$this->shortcut->addModel($modelName);
+				$this->shortcut->addModel($this->constructFullName($modelName));
 				
 				foreach ($Table->columns as $Column) {
 					$columnName      = $Column['Field'];
@@ -257,7 +257,7 @@ class Pmg extends Command
 							$length = str_replace(['(', ',', ')'], ['', '.', ''], Regex::getMatch('/\((.*)\)/m', $Column['Type']));
 							if ($isNumber) {
 								$ex     = explode(".", $length);
-								$length = 'CLEAN=[\'d\'=>' . $ex[0] . ',\'p\'=>' . $ex[1] . ',\'fd\'=>' . ($ex[0] - $ex[1]) . ']';
+								$length = Utils::literal('[\'d\'=>' . $ex[0] . ',\'p\'=>' . $ex[1] . ',\'fd\'=>' . ($ex[0] - $ex[1]) . ']');
 							}
 						}
 					}

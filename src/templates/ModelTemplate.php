@@ -38,20 +38,21 @@ class ModelTemplate extends ClassTemplate
 		}
 		
 		$select = $this->createMethod('select');
+		$select->setReturnType($this->dataMethodsClass);
 		$select->addParameter('columns')
 			//->setType('array|string')
 			->setDefaultValue(null);
-		$select->addBodyLine('return parent::doSelect($columns, ' . $this->dataMethodsClass . '::class)');
+		$select->addBodyLine('return parent::doSelect($columns, DataMethods::class)');
 		$select->addComment('Select data from database');
 		$select->addComment('@param string|array $columns - fields to use in SELECT $fields FROM, * - use to select all fields, otherwise it will be exploded by comma');
 		
 		
 		$this->constructor->addParameter('options', [])->setType('array');
-		$this->constructor->addEqBodyLine('$this->Schema', "CLEAN=$this->name" . "Schema::class");
+		$this->constructor->addEqBodyLine('$this->Schema', Utils::literal("$this->name" . "Schema::class"));
 		$this->constructor->addBodyLine('$this->Schema::construct()');
-		$this->constructor->addEqBodyLine('$this->modelColumnClassName', "CLEAN=$this->columnClass::class");     //TODO className peaks olema lihtsalt class
+		$this->constructor->addEqBodyLine('$this->modelColumnClassName', Utils::literal("$this->columnClass::class"));     //TODO className peaks olema lihtsalt class
 		$this->constructor->addEqBodyLine('$this->loggerEnabled', $this->loggerEnabled);
-		$this->constructor->addEqBodyLine('$options[\'connection\']', 'CLEAN=$options[\'connection\'] ?? \'' . $this->modelDefaultConnectionName . '\'');
+		$this->constructor->addEqBodyLine('$options[\'connection\']', Utils::literal('$options[\'connection\'] ?? \'' . $this->modelDefaultConnectionName . '\''));
 		$this->constructor->addBodyLine('parent::__construct($options)');
 		
 		$this->addComment('ORM model for ' . $this->tableName);
@@ -81,12 +82,14 @@ class ModelTemplate extends ClassTemplate
 	
 	public function setDataMethodsClass(string $dataMethodsClass): void
 	{
-		$this->setClassVariable('dataMethodsClass', true, $dataMethodsClass, 'DataMethods');
+		$this->import($dataMethodsClass, 'DataMethods');
+		$this->dataMethodsClass = $dataMethodsClass;
 	}
 	
 	public function setColumnClass(string $columnClass, bool $setUse = true): void
 	{
-		$this->setClassVariable('columnClass', $setUse, $columnClass, 'ModelColumn');
+		$this->import($columnClass, 'ModelColumn');
+		$this->columnClass = $columnClass;
 	}
 	
 	public function setModelExtender(string $class)

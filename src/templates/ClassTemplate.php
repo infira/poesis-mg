@@ -68,23 +68,4 @@ abstract class ClassTemplate extends Magics
 	{
 		$this->phpf->addUse($name, $alias);
 	}
-	
-	public function setClassVariable(string $varName, bool $setUse, string $class, string $alias = null): void
-	{
-		if ($setUse) {
-			$class = $this->addImportFromString($class, $alias);
-		}
-		$this->$varName = $class;
-	}
-	
-	private function addImportFromString(string $class, string $alias = null): string
-	{
-		if ($class[0] == '\\') {
-			$class = substr($class, 1);
-		}
-		$ex = explode('\\', $class);
-		$this->import(join('\\', $ex), $alias);
-		
-		return $alias ?: end($ex);
-	}
 }
