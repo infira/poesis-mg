@@ -188,6 +188,11 @@ class Options extends Config
 		return $this->getDataMethodsConfig($model)['class'] ?? '\Infira\Poesis\dr\DataMethods';
 	}
 	
+	public function isDataMethodsClass(string $model): bool
+	{
+		return $this->getDataMethodsClass($model) === '\Infira\Poesis\dr\DataMethods';
+	}
+	
 	public function setDataMethodsClass(string $model, string $extender)
 	{
 		$this->setModelConfig("$model", 'dataMethods.class', $extender);
