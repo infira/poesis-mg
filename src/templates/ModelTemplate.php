@@ -13,7 +13,6 @@ class ModelTemplate extends ClassTemplate
 	public $constructor;
 	
 	protected $dataMethodsClass           = '';
-	protected $columnClass                = '';
 	public    $tableName                  = '';
 	public    $name                       = '';
 	public    $modelDefaultConnectionName = '';
@@ -33,10 +32,6 @@ class ModelTemplate extends ClassTemplate
 			$this->setDataMethodsClass('\Infira\Poesis\dr\DataMethods');
 		}
 		
-		if (!$this->columnClass) {
-			$this->setColumnClass('\Infira\Poesis\orm\ModelColumn');
-		}
-		
 		$select = $this->createMethod('select');
 		$select->setReturnType($this->dataMethodsClass);
 		$select->addParameter('columns')
@@ -50,7 +45,6 @@ class ModelTemplate extends ClassTemplate
 		$this->constructor->addParameter('options', [])->setType('array');
 		$this->constructor->addEqBodyLine('$this->Schema', Utils::literal("$this->name" . "Schema::class"));
 		$this->constructor->addBodyLine('$this->Schema::construct()');
-		$this->constructor->addEqBodyLine('$this->modelColumnClassName', Utils::literal("$this->columnClass::class"));     //TODO className peaks olema lihtsalt class
 		$this->constructor->addEqBodyLine('$this->loggerEnabled', $this->loggerEnabled);
 		$this->constructor->addEqBodyLine('$options[\'connection\']', Utils::literal('$options[\'connection\'] ?? \'' . $this->modelDefaultConnectionName . '\''));
 		$this->constructor->addBodyLine('parent::__construct($options)');
@@ -58,6 +52,7 @@ class ModelTemplate extends ClassTemplate
 		$this->addComment('ORM model for ' . $this->tableName);
 		$this > $this->addComment(' ');
 		$this->addComment('@property ' . $this->name . ' $Where class where values');
+		$this->addComment('@method ' . $this->name . ' model(array $options = [])');
 		foreach ($this->columns as $columnName => $column) {
 			addExtraErrorInfo('$columnName', [$columnName => $column]);
 			$desc = $column['Type'] . ((isset($column["Comment"]) and strlen($column["Comment"]) > 0) ? ' - ' . $column["Comment"] : '');
@@ -84,12 +79,6 @@ class ModelTemplate extends ClassTemplate
 	{
 		$this->import($dataMethodsClass, 'DataMethods');
 		$this->dataMethodsClass = $dataMethodsClass;
-	}
-	
-	public function setColumnClass(string $columnClass, bool $setUse = true): void
-	{
-		$this->import($columnClass, 'ModelColumn');
-		$this->columnClass = $columnClass;
 	}
 	
 	public function setModelExtender(string $class)

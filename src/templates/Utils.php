@@ -33,8 +33,8 @@ class Utils extends \Infira\console\helper\Utils
 		return [$valueFormat, $value];
 	}
 	
-	public static function literal(string $value): Literal
+	public static function literal(string $format, ...$values): Literal
 	{
-		return new Literal($value);
+		return new Literal(sprintf($format, $values));
 	}
 }

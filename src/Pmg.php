@@ -315,7 +315,7 @@ class Pmg extends Command
 				$modelTemplate->addImports($this->opt->getModelImports($modelName));
 				
 				if ($cc = $this->opt->getColumnClass($modelName)) {
-					$modelTemplate->setColumnClass($cc);
+					$schemaTemplate->setColumnClass($cc);
 				}
 				$modelTemplate->loggerEnabled              = $this->opt->isModelLogEnabled($modelName);
 				$modelTemplate->modelDefaultConnectionName = $this->opt->getModelConnectionName($modelName);

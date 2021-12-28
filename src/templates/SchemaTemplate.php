@@ -12,11 +12,12 @@ class SchemaTemplate extends ClassTemplate
 	 */
 	public $constructor;
 	
-	public $tableName = '';
-	public $modelName = '';
-	public $aiColumn  = null;
-	public $TIDColumn = null;
-	public $isView    = null;
+	public    $tableName   = '';
+	public    $modelName   = '';
+	public    $aiColumn    = null;
+	public    $TIDColumn   = null;
+	public    $isView      = null;
+	protected $columnClass = '';
 	
 	private $columns        = [];
 	private $primaryColumns = [];
@@ -32,9 +33,14 @@ class SchemaTemplate extends ClassTemplate
 	
 	public function beforeFinalize()
 	{
+		if (!$this->columnClass) {
+			$this->setColumnClass('\Infira\Poesis\orm\ModelColumn');
+		}
+		
 		$this->constructor->addEqBodyLine('self::$tableName', $this->tableName);
 		$this->constructor->addEqBodyLine('self::$modelName', $this->modelName);
 		$this->constructor->addEqBodyLine('self::$modelClass', Utils::literal("$this->modelName::class"));
+		$this->constructor->addEqBodyLine('self::$columnClass', Utils::literal(Utils::extractClass($this->columnClass)));
 		$this->constructor->addEqBodyLine('self::$columns', $this->columns);
 		$this->constructor->addEqBodyLine('self::$primaryColumns', $this->primaryColumns);
 		$this->constructor->addEqBodyLine('self::$aiColumn', $this->aiColumn);
@@ -45,6 +51,12 @@ class SchemaTemplate extends ClassTemplate
 	public function addPrimaryColumn(string $name)
 	{
 		$this->primaryColumns[] = "'$name'";
+	}
+	
+	public function setColumnClass(string $columnClass, bool $setUse = true): void
+	{
+		$this->import($columnClass, 'ModelColumn');
+		$this->columnClass = $columnClass;
 	}
 	
 	public function setColumn(string $column, string $type, bool $signed, $length, $default, array $allowedValues, bool $isNull, bool $isAi)
