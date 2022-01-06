@@ -132,8 +132,12 @@ class Options extends Config
 		$this->setModelConfig($model, 'extender', $extender);
 	}
 	
-	public function getModelExtender(string $table): string
+	public function getModelExtender(string $table, bool $isView): string
 	{
+		if ($isView and $this->getModelConfig($table)['viewExtender']) {
+			return $this->getModelConfig($table)['viewExtender'];
+		}
+		
 		return $this->getModelConfig($table)['extender'] ?? '\Infira\Poesis\orm\Model';
 	}
 	
@@ -145,6 +149,14 @@ class Options extends Config
 	public function getModelTraits(string $model): array
 	{
 		return $this->getModelConfig($model)['traits'];
+	}
+	
+	public function getModelInterfaces(string $model): array
+	{
+		$interfaces   = $this->getModelConfig($model)['implements'];
+		$interfaces[] = '\Infira\Poesis\orm\ModelContract';
+		
+		return $interfaces;
 	}
 	
 	public function getModelImports(string $model): array

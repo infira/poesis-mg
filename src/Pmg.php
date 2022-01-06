@@ -203,15 +203,16 @@ class Pmg extends Command
 				$modelTemplate            = new ModelTemplate($modelClassType, $phpModel);
 				$modelTemplate->tableName = $tableName;
 				$modelTemplate->name      = $modelName;
-				$modelTemplate->setModelExtender($this->opt->getModelExtender($modelName));
+				$modelTemplate->setModelExtender($this->opt->getModelExtender($modelName, $Table->Table_type == 'VIEW'));
 				
-				$schemaTemplate->isView = $Table->Table_type == "VIEW";
+				$schemaTemplate->isView = $Table->Table_type == 'VIEW';
 				$TIDColumnName          = $this->opt->getTIDColumnName($modelName);
 				if ($TIDColumnName !== null and isset($Table->columns[$TIDColumnName])) {
 					$schemaTemplate->TIDColumn = $TIDColumnName;
 				}
 				
 				$modelTemplate->setTraits($this->opt->getModelTraits($modelName));
+				$modelTemplate->setImplements($this->opt->getModelInterfaces($modelName));
 				
 				if ($result = $this->db->query("SHOW INDEX FROM `$tableName` WHERE Key_name = 'PRIMARY'")) {
 					while ($Index = $result->fetch_object()) {

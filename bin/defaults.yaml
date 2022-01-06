@@ -12,9 +12,11 @@ voidTables : []
 
 model:
   extender: null
+  viewExtender : null,
   prefix: ''
   fileExt: php
   connectionName: defaultConnection
+  implements: [ ]
   traits: [ ]
   imports: [ ]
   log: true
