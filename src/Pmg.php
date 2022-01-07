@@ -130,7 +130,15 @@ class Pmg extends Command
 		
 		$this->output->region('Made models', function ()
 		{
-			$this->output->dumpArray($this->madeFiles);
+			if ($this->output->isVerbose()) {
+				foreach ($this->madeFiles as $file) {
+					//$this->output->msg('<fg=#00aaff>Installed file</>: ' . str_replace($this->opt->getDestinationPath(), '', $file));
+					$this->output->msg('<fg=#00aaff>Installed file</>: ' . $file);
+				}
+			}
+			else {
+				$this->output->info('Made ' . count($this->madeFiles) . ' models into ' . $this->opt->getDestinationPath());
+			}
 		});
 	}
 	
