@@ -17,6 +17,12 @@ class Options extends Config
 	{
 		parent::__construct(Bin::getPath('defaults.yaml'));
 		$this->mergeConfig($yamlPath);
+		
+		if ($this->exists('models')) {
+			foreach ($this->get('models') as $model => $conf) {
+				$this->config['models'][$model] = array_merge_recursive($this->config['model'], $conf);
+			}
+		}
 	}
 	
 	private function checkModel(string $model)
@@ -198,11 +204,6 @@ class Options extends Config
 	public function getDataMethodsClass(string $model): ?string
 	{
 		return $this->getDataMethodsConfig($model)['class'] ?? '\Infira\Poesis\dr\DataMethods';
-	}
-	
-	public function isDataMethodsClass(string $model): bool
-	{
-		return $this->getDataMethodsClass($model) === '\Infira\Poesis\dr\DataMethods';
 	}
 	
 	public function setDataMethodsClass(string $model, string $extender)

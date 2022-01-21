@@ -357,21 +357,19 @@ class Pmg extends Command
 	 */
 	private function makeExtras(&$phpModel, ModelTemplate &$model, string $modelName)
 	{
+		$modelDataMethodsClass = $this->opt->getDataMethodsClass($modelName);
 		if (!$this->opt->getMakeNode($modelName)) {
+			$model->setDataMethodsClass($modelDataMethodsClass);
+			
 			return;
 		}
 		
-		$dmsClassName = $modelName . 'DataMethods';
-		if ($this->opt->isDataMethodsClass($modelName)) {
-			$dmsClassName = $modelName . 'NodeDataMethods';
-		}
+		$nodeDataMethodsName = Utils::className($modelName . 'NodeDataMethods');
+		$model->setDataMethodsClass($this->constructFullName($nodeDataMethodsName));
+		$dmClassType = $phpModel->addClass($nodeDataMethodsName);
+		$dataMethods = new DataMethods($dmClassType, $phpModel);
 		
-		$nodeDataMethodsName     = Utils::className($dmsClassName);
-		$nodeDataMethodsFullName = $this->constructFullName($nodeDataMethodsName);
-		$dmClassType             = $phpModel->addClass($nodeDataMethodsName);
-		$dataMethods             = new DataMethods($dmClassType, $phpModel);
-		$model->setDataMethodsClass($nodeDataMethodsFullName);
-		$dataMethods->setExtends($this->opt->getDataMethodsClass($modelName));
+		$dataMethods->setExtends($modelDataMethodsClass);
 		
 		
 		$nodeExtender = $this->opt->getNodeExtender($modelName);
