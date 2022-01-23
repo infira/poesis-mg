@@ -8,15 +8,15 @@ connection:
 destinationPath: /Users/gentaliaru/ws/git/gitHubInfira/poesis-mg/tmp/models
 extensionsPath: ./extensions
 namespace: PoeisisORMTest
-voidTables : []
+voidTables: [ ]
 
 model:
   extender: null
-  viewExtender : null,
+  viewExtender: null,
   prefix: ''
   fileExt: php
   connectionName: defaultConnection
-  implements: [ ]
+  interfaces: [ ]
   traits: [ ]
   imports: [ ]
   log: true
@@ -31,6 +31,11 @@ model:
   #can be null
   columnClass: null
   TIDColumName: null
+
+modelExtends: [ ] #extend multiple models at once [extends => [model1,model2]]
+modelTraits: [ ] #add trait to multiple models at once [trait => [model1,model2]]
+modelInterfaces: [ ]# add interface to multiple models at once [trait => [model1,model2]]
+modelImports: [ ] #add import to multiple models at once [trait => [model1,model2]]
 
 
 modelShortcut:

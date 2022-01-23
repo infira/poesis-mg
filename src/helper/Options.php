@@ -17,8 +17,22 @@ class Options extends Config
 	{
 		parent::__construct(Bin::getPath('defaults.yaml'));
 		$this->mergeConfig($yamlPath);
-		
 		$default = $this->get('model');
+		
+		foreach (['modelExtends' => 'setModelExtender', 'modelTraits' => 'addModelTrait', 'modelInterfaces' => 'addModelInterface', 'modelImports' => 'addModelImport'] as $globalConf => $method) {
+			if (!$this->exists($globalConf)) {
+				continue;
+			}
+			foreach ($this->get($globalConf) as $class => $models) {
+				foreach ($models as $model) {
+					if (!$this->exists("models.$model")) {
+						$this->set("models.$model", $default);
+					}
+					$this->$method($model, $class);
+				}
+			}
+		}
+		
 		if ($this->exists('models')) {
 			foreach ($this->get('models') as $model => $conf) {
 				$this->set("models.$model", $default);
@@ -52,10 +66,12 @@ class Options extends Config
 		$this->set("models.$model.$config", $configValue);
 	}
 	
-	private function addToModelConfig(string $model, string $config, $configValue)
+	private function addToModelConfig(string $model, string $config, array $configValues)
 	{
 		$this->checkModel($model);
-		$this->add("models.$model.$config", $configValue);
+		foreach ($configValues as $value) {
+			$this->add("models.$model.$config", $value);
+		}
 	}
 	
 	private function getModelConfig(string $model): array
@@ -161,7 +177,7 @@ class Options extends Config
 		return $this->getModelConfig($table)['extender'] ?? '\Infira\Poesis\orm\Model';
 	}
 	
-	public function addModelTrait(string $model, string $trait)
+	public function addModelTrait(string $model, string ...$trait)
 	{
 		$this->addToModelConfig($model, 'traits', $trait);
 	}
@@ -173,15 +189,25 @@ class Options extends Config
 	
 	public function getModelInterfaces(string $model): array
 	{
-		$interfaces   = $this->getModelConfig($model)['implements'];
+		$interfaces   = $this->getModelConfig($model)['interfaces'];
 		$interfaces[] = '\Infira\Poesis\orm\ModelContract';
 		
 		return $interfaces;
 	}
 	
+	public function addModelInterface(string $model, string ...$trait)
+	{
+		$this->addToModelConfig($model, 'interfaces', $trait);
+	}
+	
 	public function getModelImports(string $model): array
 	{
 		return $this->getModelConfig($model)['imports'];
+	}
+	
+	public function addModelImport(string $model, string ...$trait)
+	{
+		$this->addToModelConfig($model, 'imports', $trait);
 	}
 	
 	public function getModelClassNamePrefix(): string
