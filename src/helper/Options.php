@@ -18,9 +18,23 @@ class Options extends Config
 		parent::__construct(Bin::getPath('defaults.yaml'));
 		$this->mergeConfig($yamlPath);
 		
+		$default = $this->get('model');
 		if ($this->exists('models')) {
 			foreach ($this->get('models') as $model => $conf) {
-				$this->config['models'][$model] = array_merge_recursive($this->config['model'], $conf);
+				$this->set("models.$model", $default);
+				foreach ($conf as $name => $value) {
+					if (!$this->exists("model.$name")) {
+						throw new Exception("default model conf('$name') does not exists");
+					}
+					$defaultType = gettype($this->get("model.$name"));
+					$type        = gettype($value);
+					if ($defaultType == 'array' and $type != 'array') {
+						throw new Exception("cant merge non arrays of conf('$name')");
+					}
+					else {
+						$this->setModelConfig($model, $name, $value);
+					}
+				}
 			}
 		}
 	}
