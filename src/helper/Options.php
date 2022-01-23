@@ -51,6 +51,8 @@ class Options extends Config
 				}
 			}
 		}
+		
+		$this->set('customModels', []);
 	}
 	
 	private function checkModel(string $model)
@@ -163,6 +165,16 @@ class Options extends Config
 		return $this->getModelConfig($model)['columnClass'];
 	}
 	
+	public function addCustomModel(string $model)
+	{
+		$this->add("customModels", $model);
+	}
+	
+	public function hasCustomModel(string $model): bool
+	{
+		return in_array($model, $this->get("customModels"));
+	}
+	
 	public function setModelExtender(string $model, string $extender)
 	{
 		$this->setModelConfig($model, 'extender', $extender);
@@ -189,7 +201,7 @@ class Options extends Config
 	
 	public function getModelInterfaces(string $model): array
 	{
-		$interfaces   = $this->getModelConfig($model)['interfaces'];
+		$interfaces   = $this->getModelConfig($model)['interfaces'] ?? [];
 		$interfaces[] = '\Infira\Poesis\orm\ModelContract';
 		
 		return $interfaces;

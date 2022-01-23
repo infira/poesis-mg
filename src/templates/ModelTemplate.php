@@ -55,23 +55,46 @@ class ModelTemplate extends ClassTemplate
 		$this->addComment('@method ' . $this->name . ' model(array $options = [])');
 		foreach ($this->columns as $columnName => $column) {
 			addExtraErrorInfo('$columnName', [$columnName => $column]);
-			$desc = $column['Type'] . ((isset($column["Comment"]) and strlen($column["Comment"]) > 0) ? ' - ' . $column["Comment"] : '');
-			$this->addComment('@property ModelColumn $' . $columnName . ' ' . $desc);
+			$desc         = $column['Type'] . ((isset($column["Comment"]) and strlen($column["Comment"]) > 0) ? ' - ' . $column["Comment"] : '');
+			$commentTypes = join('|', $column['types']);
+			$paramName    = Utils::varName($column['types'][0]);
 			
+			$this->addComment('@property ModelColumn $' . $columnName . ' ' . $desc);
+			$this->addComment('@method ' . $this->name . ' ' . $columnName . '(' . $commentTypes . ' $' . $paramName . ')');
+			
+			/*
 			$method = $this->createMethod(Utils::methodName($columnName));
 			$method->setPublic();
 			$method->setReturnType('self');
-			
-			$paramName = Utils::varName($column['types'][0]);
-			
 			$method->addParameter($paramName);//->setType(join('|', $column['types']));
 			$method->addBodyLine('return $this->add(\'' . $columnName . '\', $' . $paramName . ')');
-			
 			$method->addComment('Set value for ' . $columnName);
-			$commentTypes = join('|', $column['types']);
 			$method->addComment('@param ' . $commentTypes . ' $' . $paramName . ' - ' . $desc);
 			$method->addComment('@return self');
+			*/
 			clearExtraErrorInfo();
+		}
+	}
+	
+	public function addIndexMethods(array $indexMethods): void
+	{
+		foreach ($indexMethods as $indexName => $columns) {
+			$columnComment = [];
+			$method        = $this->createMethod(Utils::methodName($indexName) . '_index');
+			$method->addComment('Set value for ' . join(', ', $columnComment) . ' index');
+			$method->addComment('');
+			foreach ($columns as $Col) {
+				$columnComment[] = $Col->Column_name;
+				$method->addParameter($Col->Column_name);
+				
+				$column = $this->columns[$Col->Column_name];
+				$desc   = $column['Type'] . ((isset($column["Comment"]) and strlen($column["Comment"]) > 0) ? ' - ' . $column["Comment"] : '');
+				
+				$commentTypes = join('|', $column['types']);
+				$method->addComment('@param ' . $commentTypes . ' $' . $Col->Column_name . ' - ' . $desc);
+				$method->addBodyLine('$this->add(\'' . $Col->Column_name . '\', $' . $Col->Column_name . ')');
+			}
+			$method->addBodyLine('return $this');
 		}
 	}
 	
