@@ -7,48 +7,46 @@ use Nette\PhpGenerator\ClassType;
 
 class ModelTemplate extends ClassTemplate
 {
-	/**
-	 * @var \Nette\PhpGenerator\Method
-	 */
-	public $constructor;
+	protected $dataMethodsClass = '';
+	protected $columnClass      = '';
+	public    $name             = '';
 	
-	protected $dataMethodsClass           = '';
-	public    $tableName                  = '';
-	public    $name                       = '';
-	public    $modelDefaultConnectionName = '';
-	public    $loggerEnabled              = false;
-	
-	private $columns = [];
+	private $columns   = [];
+	public  $tableName = '';
+	public  $modelName = '';
+	private $modelProperties;
 	
 	public function __construct(ClassType $class, object $phpNamespace)
 	{
 		parent::__construct($class, $phpNamespace);
-		$this->constructor = $this->createMethod('__construct');
 	}
 	
 	public function beforeFinalize()
 	{
-		if (!$this->dataMethodsClass) {
-			$this->setDataMethodsClass('\Infira\Poesis\dr\DataMethods');
+		if ($this->dataMethodsClass !== '\Infira\Poesis\dr\DataMethods') {
+			//$this->setDataMethodsClass('\Infira\Poesis\dr\DataMethods');
+			$select = $this->createMethod('select');
+			$select->addParameter('columns')
+				//->setType('array|string')
+				->setDefaultValue(null);
+			$select->addBodyLine('return parent::doSelect($columns, %s)', Utils::extractClass($this->dataMethodsClass));
+			$select->addComment('Select data from database');
+			$select->addComment('@param string|array $columns - fields to use in SELECT $fields FROM, * - use to select all fields, otherwise it will be exploded by comma');
+			$select->addComment('@return ' . $this->dataMethodsClass);
 		}
 		
-		$select = $this->createMethod('select');
-		$select->setReturnType($this->dataMethodsClass);
-		$select->addParameter('columns')
-			//->setType('array|string')
-			->setDefaultValue(null);
-		$select->addBodyLine('return parent::doSelect($columns, DataMethods::class)');
-		$select->addComment('Select data from database');
-		$select->addComment('@param string|array $columns - fields to use in SELECT $fields FROM, * - use to select all fields, otherwise it will be exploded by comma');
+		if (!$this->columnClass) {
+			$this->columnClass = '\Infira\Poesis\orm\ModelColumn';
+		}
+		$this->import($this->columnClass, 'ModelColumn');
 		
+		if ($this->columnClass !== '\Infira\Poesis\orm\ModelColumn') {
+			$this->addSchemaProperty('columnClass', Utils::literal("ModelColumn::class"));
+		}
 		
-		$this->constructor->addParameter('options', [])->setType('array');
-		$this->constructor->addEqBodyLine('$this->Schema', Utils::literal("$this->name" . "Schema::class"));
-		$this->constructor->addBodyLine('$this->Schema::construct()');
-		$this->constructor->addEqBodyLine('$this->loggerEnabled', $this->loggerEnabled);
-		$this->constructor->addEqBodyLine('$options[\'connection\']', Utils::literal('$options[\'connection\'] ?? \'' . $this->modelDefaultConnectionName . '\''));
-		$this->constructor->addBodyLine('parent::__construct($options)');
-		
+		foreach ($this->modelProperties as $name => $value) {
+			$this->addProperty($name, $value)->setProtected();
+		}
 		$this->addComment('ORM model for ' . $this->tableName);
 		$this > $this->addComment(' ');
 		$this->addComment('@property ' . $this->name . ' $Where class where values');
@@ -100,13 +98,13 @@ class ModelTemplate extends ClassTemplate
 	
 	public function setDataMethodsClass(string $dataMethodsClass): void
 	{
-		$this->import($dataMethodsClass, 'DataMethods');
+		$this->import($dataMethodsClass);
 		$this->dataMethodsClass = $dataMethodsClass;
 	}
 	
 	public function setModelExtender(string $class)
 	{
-		$this->import($class, 'Model');
+		$this->import($class);
 		$this->class->setExtends($class);
 	}
 	
@@ -136,5 +134,20 @@ class ModelTemplate extends ClassTemplate
 		}
 		$column["types"][]          = 'Field';
 		$this->columns[$columnName] = $column;
+	}
+	
+	public function addPrimaryColumn(string $name)
+	{
+		$this->modelProperties['primaryColumns'][] = $name;
+	}
+	
+	public function setColumnClass(string $columnClass): void
+	{
+		$this->columnClass = $columnClass;
+	}
+	
+	public function addSchemaProperty(string $name, $value)
+	{
+		$this->modelProperties[$name] = $value;
 	}
 }

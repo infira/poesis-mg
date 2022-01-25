@@ -25,34 +25,27 @@ class MethodTemplate extends Magics
 	public function addEqBodyLine(string $set, $value, $valueFormat = null)
 	{
 		$this->eqLineSetMaxLen = max($this->eqLineSetMaxLen, strlen($set));
-		if (!$valueFormat)
-		{
+		if (!$valueFormat) {
 			$parsed      = Utils::parseValueFormat($value, $valueFormat);
 			$value       = $parsed[1];
 			$valueFormat = $parsed[0];
 		}
-		$this->doAddBodyLine([$set => sprintf($valueFormat, $value)], 'eq');
+		$this->lines[] = ['line' => [$set, sprintf($valueFormat, $value)], 'type' => 'eq'];
 	}
 	
-	public function addBodyLine(string $line)
+	public function addBodyLine(string $line, string ...$sprintfValues)
 	{
-		$this->doAddBodyLine($line, 'normal');
-	}
-	
-	private function doAddBodyLine($line, string $type)
-	{
-		$this->lines[] = ['line' => $line, 'type' => $type];
+		$line          = $sprintfValues ? vsprintf($line, $sprintfValues) : $line;
+		$this->lines[] = ['line' => $line, 'type' => 'normal'];
 	}
 	
 	public function construct(): Method
 	{
-		foreach ($this->lines as $line)
-		{
+		foreach ($this->lines as $line) {
 			$lineStr = $line['line'];
-			if ($line['type'] == 'eq')
-			{
-				$set     = array_key_first($lineStr);
-				$value   = $lineStr[$set];
+			if ($line['type'] == 'eq') {
+				$set     = $lineStr[0];
+				$value   = $lineStr[1];
 				$eq      = str_repeat(' ', $this->eqLineSetMaxLen - strlen($set)) . ' = ';
 				$lineStr = $set . $eq . $value;
 			}

@@ -202,7 +202,6 @@ class Options extends Config
 	public function getModelInterfaces(string $model): array
 	{
 		$interfaces   = $this->getModelConfig($model)['interfaces'] ?? [];
-		$interfaces[] = '\Infira\Poesis\orm\ModelContract';
 		
 		return $interfaces;
 	}

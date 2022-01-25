@@ -12,7 +12,6 @@ use Infira\Utils\Regex;
 use Infira\Utils\File;
 use Illuminate\Support\Str;
 use Infira\console\Command;
-use Infira\pmg\templates\SchemaTemplate;
 use Infira\pmg\templates\ModelTemplate;
 use Infira\pmg\templates\ModelShortcutTemplate;
 use Nette\PhpGenerator\PhpFile;
@@ -20,6 +19,7 @@ use Nette\PhpGenerator\PhpNamespace;
 use Infira\pmg\templates\Utils;
 use Infira\pmg\templates\DataMethods;
 use Nette\PhpGenerator\ClassType;
+use Infira\pmg\templates\DbSchemaTemplate;
 
 class Pmg extends Command
 {
@@ -42,6 +42,10 @@ class Pmg extends Command
 	 * @var ModelShortcutTemplate
 	 */
 	private $shortcut;
+	/**
+	 * @var \Infira\pmg\templates\DbSchemaTemplate
+	 */
+	private $schema;
 	
 	public function __construct()
 	{
@@ -109,7 +113,8 @@ class Pmg extends Command
 		
 		
 		$shortcutFileName = $this->opt->getShortcutName() . '.' . $this->opt->getShortcutTraitFileNameExtension();
-		$flushExcept      = [$shortcutFileName, 'dummy.txt'];
+		$dbSchemaFileName = 'DbSchema.' . $this->opt->getShortcutTraitFileNameExtension();
+		$flushExcept      = [$shortcutFileName, $dbSchemaFileName, 'dummy.txt'];
 		if (strpos($this->opt->getExtensionsPath(), $this->opt->getDestinationPath()) !== false) {
 			$bn = str_replace($this->opt->getDestinationPath(), '', $this->opt->getExtensionsPath());
 			if (substr($bn, -1) == '/') {
@@ -131,11 +136,18 @@ class Pmg extends Command
 		$shortcutFile     = new PhpFile();
 		$shortcutPhpCType = $shortcutFile->addTrait($this->constructFullName($this->opt->getShortcutName()));
 		$this->shortcut   = new ModelShortcutTemplate($shortcutPhpCType, $shortcutFile);
+		
+		$dbSchemaFile     = new PhpFile();
+		$dbSchemaPhpCType = $dbSchemaFile->addClass($this->constructFullName('DbSchema'));
+		$this->schema     = new DbSchemaTemplate($dbSchemaPhpCType, $dbSchemaFile);
 		$this->makeTableClassFiles();
 		$this->shortcut->addImports($this->opt->getShortcutImports());
+		
 		$this->shortcut->finalise();
+		$this->schema->finalise();
 		
 		$this->makeFile($shortcutFileName, $shortcutFile->__toString());
+		$this->makeFile($dbSchemaFileName, $dbSchemaFile->__toString());
 		
 		$this->output->region('Made models', function ()
 		{
@@ -193,7 +205,8 @@ class Pmg extends Command
 			}
 			
 			foreach ($tablesData as $tableName => $Table) {
-				$modelName      = Utils::className($this->opt->getModelClassNamePrefix() . $tableName);
+				$prefix         = $this->opt->getModelClassNamePrefix() ? $this->opt->getModelClassNamePrefix() . '_' : '';
+				$modelName      = Utils::className($prefix . $tableName);
 				$modelClassName = $modelName;
 				if ($this->opt->hasCustomModel($modelName)) {
 					$modelClassName .= "Model";
@@ -214,24 +227,31 @@ class Pmg extends Command
 				if ($this->opt->hasCustomModel($modelName)) {
 					$modelClassType->setAbstract();
 				}
-				$schemaClassType = $phpModel->addClass($modelName . 'Schema');
 				$phpModel->addUse('\Infira\Poesis\Poesis');
 				$phpModel->addUse('\Infira\Poesis\orm\node\Field');
 				
-				$schemaTemplate            = new SchemaTemplate($schemaClassType, $phpModel);
-				$schemaTemplate->modelName = $modelName;
-				$schemaTemplate->tableName = $tableName;
-				
-				
 				$modelTemplate            = new ModelTemplate($modelClassType, $phpModel);
 				$modelTemplate->tableName = $tableName;
-				$modelTemplate->name      = $modelName;
+				$modelTemplate->addSchemaProperty('table', $tableName);
+				$modelTemplate->name = $modelName;
 				$modelTemplate->setModelExtender($this->opt->getModelExtender($modelName, $Table->Table_type == 'VIEW'));
+				if ($cc = $this->opt->getColumnClass($modelName)) {
+					$modelTemplate->setColumnClass($cc);
+				}
+				if ($this->opt->isModelLogEnabled($modelName)) {
+					$modelTemplate->addSchemaProperty('log', true);
+				}
+				if (($connectionName = $this->opt->getModelConnectionName($modelName)) != 'defaultConnection') {
+					$modelTemplate->addSchemaProperty('connection', $connectionName);
+				}
 				
-				$schemaTemplate->isView = $Table->Table_type == 'VIEW';
-				$TIDColumnName          = $this->opt->getTIDColumnName($modelName);
+				
+				if ($Table->Table_type == 'VIEW') {
+					$modelTemplate->addSchemaProperty('isView', true);
+				}
+				$TIDColumnName = $this->opt->getTIDColumnName($modelName);
 				if ($TIDColumnName !== null and isset($Table->columns[$TIDColumnName])) {
-					$schemaTemplate->TIDColumn = $TIDColumnName;
+					$modelTemplate->addSchemaProperty('TIDColumn', $TIDColumnName);
 				}
 				
 				$modelTemplate->setTraits($this->opt->getModelTraits($modelName));
@@ -239,7 +259,7 @@ class Pmg extends Command
 				
 				if ($result = $this->db->query("SHOW INDEX FROM `$tableName` WHERE Key_name = 'PRIMARY'")) {
 					while ($Index = $result->fetch_object()) {
-						$schemaTemplate->addPrimaryColumn($Index->Column_name);
+						$modelTemplate->addPrimaryColumn($Index->Column_name);
 					}
 				}
 				
@@ -264,17 +284,15 @@ class Pmg extends Command
 					$isNull   = $Column["Null"] == "YES";
 					
 					if ($Column["Extra"] == "auto_increment") {
-						$schemaTemplate->aiColumn = $columnName;
+						$modelTemplate->addSchemaProperty('aiColumn', $columnName);
 					}
 					
 					$signed        = (bool)strpos(strtolower($Column['Type']), "unsigned") !== false;
 					$length        = null;
 					$allowedValues = [];
-					if (strpos($Column['Type'], "enum") !== false) {
-						$allowedValues = [str_replace(["enum", "(", ")"], "", $Column['Type'])];
-					}
-					elseif (strpos($Column['Type'], "set") !== false) {
-						$allowedValues = [str_replace(["set", "(", ")"], "", $Column['Type'])];
+					if (preg_match('/(enum|set)\((.+?)\)/m', $Column['Type'])) {
+						preg_match_all('/[\'"](.+?)[\'"]/m', $Column['Type'], $numMatches);
+						$allowedValues = $numMatches[1];
 					}
 					else {
 						if (strpos($Column['Type'], "(")) {
@@ -292,14 +310,14 @@ class Pmg extends Command
 						$default = '';
 					}
 					elseif ($isInt or $isNumber) {
-						$default = ($Column['Default'] === null) ? 'Poesis::NONE' : addslashes($Column['Default']);
+						$default = ($Column['Default'] === null) ? '__poesis_none__' : addslashes($Column['Default']);
 					}
 					else {
 						if ($Column['Default'] === null and $isNull) {
 							$default = null;
 						}
 						elseif ($Column['Default'] === null) {
-							$default = 'Poesis::NONE';
+							$default = '__poesis_none__';
 						}
 						elseif ($Column['Default'] == "''") {
 							$default = '';
@@ -309,7 +327,7 @@ class Pmg extends Command
 						}
 						
 					}
-					$schemaTemplate->setColumn($columnName, $type, $signed, $length, $default, $allowedValues, $isNull, $isAi);
+					$this->schema->setColumn($tableName, $columnName, $type, $signed, $length, $default, $allowedValues, $isNull, $isAi);
 				} //EOF each columns
 				
 				//make index methods
@@ -324,18 +342,10 @@ class Pmg extends Command
 					return count($var) > 1;
 				});
 				$modelTemplate->addIndexMethods($indexMethods);
-				
 				$modelTemplate->addImports($this->opt->getModelImports($modelName));
-				
-				if ($cc = $this->opt->getColumnClass($modelName)) {
-					$schemaTemplate->setColumnClass($cc);
-				}
-				$modelTemplate->loggerEnabled              = $this->opt->isModelLogEnabled($modelName);
-				$modelTemplate->modelDefaultConnectionName = $this->opt->getModelConnectionName($modelName);
 				$this->makeExtras($phpModel, $modelTemplate, $modelName);
 				
 				$modelTemplate->finalise();
-				$schemaTemplate->finalise();
 				
 				$this->makeFile($modelClassName . '.' . $this->opt->getModelFileNameExtension(), $modelFile->__toString());
 			}
