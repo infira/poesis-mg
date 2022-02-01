@@ -36,11 +36,11 @@ class ModelTemplate extends ClassTemplate
 		}
 		
 		if (!$this->columnClass) {
-			$this->columnClass = '\Infira\Poesis\orm\ModelColumn';
+			$this->columnClass = '\Infira\Poesis\clause\ModelColumn';
 		}
 		$this->import($this->columnClass, 'ModelColumn');
 		
-		if ($this->columnClass !== '\Infira\Poesis\orm\ModelColumn') {
+		if ($this->columnClass !== '\Infira\Poesis\clause\ModelColumn') {
 			$this->addSchemaProperty('columnClass', Utils::literal("ModelColumn::class"));
 		}
 		
@@ -90,7 +90,7 @@ class ModelTemplate extends ClassTemplate
 				
 				$commentTypes = join('|', $column['types']);
 				$method->addComment('@param ' . $commentTypes . ' $' . $Col->Column_name . ' - ' . $desc);
-				$method->addBodyLine('$this->add(\'' . $Col->Column_name . '\', $' . $Col->Column_name . ')');
+				$method->addBodyLine('$this->add2Clause($this->value2ModelColumn(\'%s\', $%s));', $Col->Column_name, $Col->Column_name);
 			}
 			$method->addBodyLine('return $this');
 		}

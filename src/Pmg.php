@@ -228,7 +228,7 @@ class Pmg extends Command
 					$modelClassType->setAbstract();
 				}
 				$phpModel->addUse('\Infira\Poesis\Poesis');
-				$phpModel->addUse('\Infira\Poesis\orm\node\Field');
+				$phpModel->addUse('\Infira\Poesis\clause\Field');
 				
 				$modelTemplate            = new ModelTemplate($modelClassType, $phpModel);
 				$modelTemplate->tableName = $tableName;

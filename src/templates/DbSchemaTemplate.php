@@ -21,7 +21,7 @@ class DbSchemaTemplate extends ClassTemplate
 	public function __construct(ClassType $class, object $phpNamespace)
 	{
 		parent::__construct($class, $phpNamespace);
-		$this->setExtends('\Infira\Poesis\orm\DbSchema');
+		$this->setExtends('\Infira\Poesis\DbSchema');
 	}
 	
 	public function beforeFinalize()

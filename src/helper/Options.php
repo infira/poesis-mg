@@ -186,7 +186,7 @@ class Options extends Config
 			return $this->getModelConfig($table)['viewExtender'];
 		}
 		
-		return $this->getModelConfig($table)['extender'] ?? '\Infira\Poesis\orm\Model';
+		return $this->getModelConfig($table)['extender'] ?? '\Infira\Poesis\Model';
 	}
 	
 	public function addModelTrait(string $model, string ...$trait)
@@ -274,7 +274,7 @@ class Options extends Config
 	
 	public function getNodeExtender(string $model): ?string
 	{
-		return $this->getModelNodeConfig($model)['extender'] ?? '\Infira\Poesis\orm\Node';
+		return $this->getModelNodeConfig($model)['extender'] ?? '\Infira\Poesis\dr\Node';
 	}
 	
 	public function getMakeNode(string $model): bool
