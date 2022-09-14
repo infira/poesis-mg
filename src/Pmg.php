@@ -184,7 +184,7 @@ class Pmg extends Command
 			while ($Row = $tables->fetch_object()) {
 				$columnName = "Tables_in_" . $this->dbName;
 				$tableName  = $Row->$columnName;
-				if (!$this->opt->isTableVoided($tableName)) {
+				if ($this->opt->canMake($tableName)) {
 					unset($Row->$columnName);
 					unset($dbName);
 					$columnsRes = $this->db->query("SHOW FULL COLUMNS FROM`" . $tableName . '`');

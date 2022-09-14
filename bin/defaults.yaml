@@ -9,6 +9,7 @@ destinationPath: /Users/gentaliaru/ws/git/gitHubInfira/poesis-mg/tmp/models
 extensionsPath: ./extensions
 namespace: PoeisisORMTest
 voidTables: [ ]
+makeOnlyTables: [ ]
 
 model:
   extender: null
