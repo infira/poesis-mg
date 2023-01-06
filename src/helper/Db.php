@@ -2,7 +2,6 @@
 
 namespace Infira\pmg\helper;
 
-use Infira\Utils\Variable;
 use stdClass;
 use mysqli;
 use Exception;
@@ -104,96 +103,7 @@ class Db
 	{
 		return $this->execute($query, "real_query");
 	}
-	
-	/**
-	 * Run sql query from file
-	 *
-	 * @param string $fileLocation
-	 * @param array  $vars
-	 * @throws \Exception
-	 */
-	public function fileQuery(string $fileLocation, array $vars = []): void
-	{
-		if (!file_exists($fileLocation))
-		{
-			throw new Exception("query file $fileLocation does not exists");
-		}
-		$this->complexQuery(Variable::assign($vars, file_get_contents($fileLocation)));
-	}
-	
-	/**
-	 * Run complex query (variables, comments, etc)
-	 *
-	 * @param string $query
-	 * @param array  $vars
-	 * @throws \Exception
-	 */
-	public function complexQuery(string $query, array $vars = []): void
-	{
-		$query = Variable::assign($vars, trim($query));
-		
-		$realQueries = [];
-		$k           = 0;
-		foreach (preg_split("/((\r?\n)|(\r\n?))/", $query) as $line)
-		{
-			$line = trim($line);
-			
-			if (substr($line, 0, 2) == '--' || $line == '')
-			{
-				continue;
-			}
-			
-			if (!array_key_exists($k, $realQueries))
-			{
-				$realQueries[$k] = "";
-			}
-			if ($line)
-			{
-				$realQueries[$k] .= $line . "\n";
-			}
-			if (substr(trim($line), -1, 1) == ';')
-			{
-				$k++;
-			}
-		}
-		foreach ($realQueries as $query)
-		{
-			$this->query($query);
-		}
-	}
-	
-	/**
-	 * set variable to database
-	 *
-	 * @param string $name
-	 * @param mixed  $value
-	 * @throws \Exception
-	 */
-	public function setVar(string $name, $value)
-	{
-		if (is_bool($value))
-		{
-			$value = $value === true ? 'true' : 'false';
-		}
-		else
-		{
-			$value = $this->escape($value);
-		}
-		$this->query("SET @$name = " . $value);
-	}
-	
-	/**
-	 * Get mysql variable value
-	 *
-	 * @param string $name
-	 * @throws \Exception
-	 * @return mixed
-	 */
-	public function getVar(string $name)
-	{
-		return $this->query("SELECT @$name")->fetch_assoc()["@$name"];
-	}
-	
+
 	//###################################################### Other helpers
 	
 	/**

@@ -3,16 +3,20 @@
 namespace Infira\pmg\helper;
 
 
-use Infira\Utils\Dir;
-use Infira\Utils\Regex;
-use Infira\Utils\File;
+use Nette\PhpGenerator\ClassType;
+use Wolo\Regex;
 use stdClass;
 use Exception;
 use Infira\console\helper\Config;
 use Infira\console\Bin;
+use Wolo\File\File;
+use Wolo\File\Folder;
+use Wolo\File\Path;
 
 class Options extends Config
 {
+    public static string $defaultDataModelsClass = '\Infira\Poesis\dr\DataMethods';
+
     public function __construct(string $yamlPath)
     {
         parent::__construct(Bin::getPath('defaults.yaml'));
@@ -127,8 +131,8 @@ class Options extends Config
         if (!is_dir($path)) {
             throw new Exception("scan model extensions folder must be correct path($path)");
         }
-        foreach (Dir::getFileNames($path) as $fn) {
-            $file = Dir::fixPath($path) . $fn;
+        foreach (Folder::fileNames($path) as $fn) {
+            $file = Path::join($path, $fn);
             if ($dm = $this->findFileExtension($file, 'Model')) {
                 $this->setModelExtender($dm->model, $dm->name);
             }
@@ -149,30 +153,34 @@ class Options extends Config
         $pi = (object)pathinfo($file);
         $fileName = $pi->filename;
 
-        if (!preg_match('/(.+)(' . $type . '.*)/m', $fileName, $matches)) {
+        if (!preg_match('/(.+)('.$type.'.*)/m', $fileName, $matches)) {
             return null;
         }
         $model = $matches[1];
-        $name = '\\' . $matches[0];
+        $name = '\\'.$matches[0];
 
-        $fileContent = File::getContent($file);
-        if (Regex::isMatch('/namespace (.+)?;/m', $fileContent)) {
+        $fileContent = File::content($file);
+        if (Regex::match('/namespace (.+)?;/m', $fileContent)) {
             $matches = [];
             preg_match_all('/namespace (.+)?;/m', $fileContent, $matches);
-            $name = '\\' . $matches[1][0] . $name;
+            $name = '\\'.$matches[1][0].$name;
         }
 
         return (object)['model' => $model, 'name' => $name];
     }
 
-    public function getNamespace(): ?string
+    public function getNamespace(string $default = ''): ?string
     {
-        return $this->config['namespace'];
+        return $this->getConfig('namespace', $default);
     }
 
-    public function getDestinationPath(): string
+    public function getDestinationPath(string ...$path): string
     {
-        return $this->config['destinationPath'];
+        if (!$this->config['destinationPath']) {
+            throw new \RuntimeException('destinationPath not defined');
+        }
+
+        return Path::join($this->config['destinationPath'], ...$path);
     }
 
     public function setDestinationPath(string $path)
@@ -180,12 +188,16 @@ class Options extends Config
         $this->config['destinationPath'] = $path;
     }
 
-    public function getExtensionsPath(): ?string
+    public function getExtensionsPath(string ...$path): string
     {
-        return $this->config['extensionsPath'];
+        if (!$this->config['extensionsPath']) {
+            throw new \RuntimeException('extensionsPath not defined');
+        }
+
+        return Path::join($this->config['extensionsPath'], ...$path);
     }
 
-    public function setExtensionsPath(string $path)
+    public function setExtensionsPath(string $path): void
     {
         $this->config['extensionsPath'] = $path;
     }
@@ -195,14 +207,14 @@ class Options extends Config
         return $this->getModelConfig($model)['columnClass'];
     }
 
-    public function addCustomModel(string $model)
+    public function hasCustomModel(string $name): bool
     {
-        $this->add("customModels", $model);
+        return $this->exists("customModels.$name");
     }
 
-    public function hasCustomModel(string $model): bool
+    public function getCustomModel(string $name): ClassType //TODO not need it anymore
     {
-        return in_array($model, $this->get("customModels"));
+        return $this->get("customModels.$name");
     }
 
     public function setModelExtender(string $model, string $extender)
@@ -284,7 +296,7 @@ class Options extends Config
 
     public function getDataMethodsClass(string $model): ?string
     {
-        return $this->getDataMethodsConfig($model)['class'] ?? '\Infira\Poesis\dr\DataMethods';
+        return $this->getDataMethodsConfig($model)['class'] ?? self::$defaultDataModelsClass;
     }
 
     public function setDataMethodsClass(string $model, string $extender)

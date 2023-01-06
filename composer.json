@@ -1,24 +1,25 @@
 {
   "name": "infira/poesis-mg",
   "autoload": {
-	"psr-4": {
-	  "Infira\\pmg\\helper\\": "src/helper",
-	  "Infira\\pmg\\": "src/"
-	}
+    "psr-4": {
+      "Infira\\pmg\\helper\\": "src/helper",
+      "Infira\\pmg\\": "src/"
+    }
   },
   "minimum-stability": "dev",
   "authors": [
-	{
-	  "name": "Gen Taliar",
-	  "email": "gen@infira.ee"
-	}
+    {
+      "name": "Gen Taliar",
+      "email": "gen@infira.ee"
+    }
   ],
   "bin": [
-	"bin/pmg"
+    "bin/pmg"
   ],
   "require": {
-	"infira/console": "*",
-    "nette/php-generator": "v3.6.x-dev",
-    "nikic/php-parser": "^4.13"
+    "php": "^8.0",
+    "infira/console": "*",
+    "nette/php-generator": "v3.6.9",
+    "nikic/php-parser": "v4.15.2"
   }
 }
