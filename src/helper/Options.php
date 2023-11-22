@@ -3,15 +3,15 @@
 namespace Infira\pmg\helper;
 
 
-use Nette\PhpGenerator\ClassType;
-use Wolo\Regex;
-use stdClass;
 use Exception;
-use Infira\console\helper\Config;
 use Infira\console\Bin;
+use Infira\console\helper\Config;
+use Nette\PhpGenerator\ClassType;
+use stdClass;
 use Wolo\File\File;
 use Wolo\File\Folder;
 use Wolo\File\Path;
+use Wolo\Regex;
 
 class Options extends Config
 {
@@ -136,13 +136,13 @@ class Options extends Config
             if ($dm = $this->findFileExtension($file, 'Model')) {
                 $this->setModelExtender($dm->model, $dm->name);
             }
-            elseif ($dm = $this->findFileExtension($file, 'Trait')) {
+            else if ($dm = $this->findFileExtension($file, 'Trait')) {
                 $this->addModelTrait($dm->model, $dm->name);
             }
-            elseif ($dm = $this->findFileExtension($file, 'DataMethods')) {
+            else if ($dm = $this->findFileExtension($file, 'DataMethods')) {
                 $this->setDataMethodsClass($dm->model, $dm->name);
             }
-            elseif ($dm = $this->findFileExtension($file, 'Node')) {
+            else if ($dm = $this->findFileExtension($file, 'Node')) {
                 $this->setModelNodeExtendor($dm->model, $dm->name);
             }
         }
@@ -171,7 +171,7 @@ class Options extends Config
 
     public function getNamespace(string $default = ''): ?string
     {
-        return $this->getConfig('namespace', $default);
+        return $this->getConfig('namespace', $default) ?? $default;
     }
 
     public function getDestinationPath(string ...$path): string
@@ -266,6 +266,11 @@ class Options extends Config
     public function getModelClassNamePrefix(): string
     {
         return $this->config['model']['prefix'];
+    }
+
+    public function getModelTableNamePattern(): ?string
+    {
+        return $this->config['model']['modelTableNamePattern'] ?? null;
     }
 
     public function getModelFileNameExtension(): string

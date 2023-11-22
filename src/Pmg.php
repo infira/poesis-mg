@@ -10,25 +10,16 @@ use Infira\pmg\helper\Db;
 use Infira\pmg\helper\ModelColumn;
 use Infira\pmg\helper\Options;
 use Infira\pmg\templates\ClassPrinter;
-use Infira\pmg\templates\ClassTemplate;
-use Infira\pmg\templates\DataMethods;
 use Infira\pmg\templates\DbSchema;
-use Infira\pmg\templates\ModelShortcut;
 use Infira\pmg\templates\Model;
+use Infira\pmg\templates\ModelShortcut;
 use Infira\pmg\templates\Utils;
-use Nette\PhpGenerator\Helpers;
-use Nette\PhpGenerator\Printer;
-use Wolo\Regex;
-use Nette\PhpGenerator\ClassType;
-use Nette\PhpGenerator\PhpFile;
-use Nette\PhpGenerator\PhpNamespace;
 use Symfony\Component\Console\Input\InputArgument;
-use Wolo\File\File;
 use Wolo\File\Path;
+use Wolo\Regex;
 
 class Pmg extends Command
 {
-    const REMOVE_EMPTY_LINE = '[REMOVE_EMPTY_LINE]';
     private string $dbName = '';
     private Db $db;
     private Options $opt;
@@ -56,45 +47,32 @@ class Pmg extends Command
      */
     public function runCommand()
     {
-        $yamlFile = $this->input->getArgument('yaml');
-
+        $yamlFile = realpath($this->input->getArgument('yaml'));
         if (!file_exists($yamlFile)) {
             $this->error('Config files does not exist');
         }
         $this->opt = new Options($yamlFile);
+        $yamlPath = dirname($yamlFile);
         $destinationPath = $this->opt->getDestinationPath();
+        if ($destinationPath[0] !== '/') {
+            $destinationPath = Path::join($yamlPath, $destinationPath);
+        }
+        if ($this->validateWriteablePath($destinationPath)) {
+            $this->opt->setDestinationPath($destinationPath);
+        }
+        else {
+            $this->error("destination path('$destinationPath') is not a folder or not writable");
+        }
         $extensionsPath = $this->opt->getExtensionsPath();
-
-        $yamlDirName = dirname($yamlFile);
-        if ($extensionsPath) {
-            if ($extensionsPath[0] !== '/') {
-                $extensionsPath = realpath(Path::join($yamlDirName, $extensionsPath));
-                if (!is_dir($extensionsPath)) {
-                    $this->error("extensions path('$extensionsPath') not found");
-                }
-            }
-            if (!is_dir($extensionsPath)) {
-                $this->error("extensions path $extensionsPath not found");
-            }
-            if (!is_writable($extensionsPath)) {
-                $this->error('extensions path not writable');
-            }
+        if ($extensionsPath[0] !== '/') {
+            $extensionsPath = Path::join($yamlPath, $extensionsPath);
+        }
+        if ($this->validateWriteablePath($extensionsPath)) {
             $this->opt->setExtensionsPath($extensionsPath);
         }
-
-
-        if ($destinationPath[0] !== '/') {
-            $destinationPath = realpath(Path::join($yamlDirName, $destinationPath));
+        else {
+            $this->error("extensions path('$extensionsPath') is not a folder or not writable");
         }
-        if (!is_dir($destinationPath)) {
-            $this->error("destination path('$destinationPath') not found");
-        }
-        if (!is_writable($destinationPath)) {
-            $this->error("destination path('$destinationPath') not writable");
-        }
-        $this->opt->setDestinationPath($destinationPath);
-
-
         $connection = (object)$this->opt->get('connection');
         $this->db = new Db('pmg', $connection->host, $connection->user, $connection->pass, $connection->db, $connection->port);
         $this->dbName = $connection->db;
@@ -121,7 +99,33 @@ class Pmg extends Command
         });
     }
 
-    private function constructFullName(string $name): string //TODO miks seda kas see ei võiks kusagil make juures olla?
+    private function validateWriteablePath(string $path): bool
+    {
+        $path = realpath($path);
+        if (!$path) {
+            return false;
+        }
+        if (!is_dir($path)) {
+            return false;
+        }
+        if (!is_writable($path)) {
+            return false;
+        }
+        return true;
+    }
+
+    private function makeModelName(string $table): string
+    {
+        if ($tableNamePattern = $this->opt->getModelTableNamePattern()) {
+            if ($match = Regex::match($tableNamePattern, $table)) {
+                $table = $match;
+            }
+        }
+        $prefix = $this->opt->getModelClassNamePrefix() ? $this->opt->getModelClassNamePrefix().'_' : '';
+        return Utils::className($prefix.$table);
+    }
+
+    private function constructFullName(string $name): string
     {
         $name = Utils::className($name);
 
@@ -163,10 +167,7 @@ class Pmg extends Command
             }
 
             foreach ($tablesData as $tableName => $Table) {
-                $prefix = $this->opt->getModelClassNamePrefix() ? $this->opt->getModelClassNamePrefix().'_' : '';
-
-
-                $modelName = Utils::className($prefix.$tableName);
+                $modelName = $this->makeModelName($tableName);
                 $modelTemplate = new Model(
                     $modelName,
                     $tableName,
