@@ -198,7 +198,7 @@ class Model extends ClassTemplate
 
     private function makeExtras(): void
     {
-        if (!$this->opt->getMakeNode($this->modelName)) {
+        if (!$this->opt->getMakeModelNode($this->modelName)) {
             return;
         }
         $dataMethods = new ClassTemplate($this->opt, $this->namespace);
@@ -206,7 +206,7 @@ class Model extends ClassTemplate
         $dataMethods->setExtends($dataMethods->getName());
 
 
-        $nodeExtender = $this->opt->getNodeExtender($this->modelName);
+        $nodeExtender = $this->opt->getModelNodeExtender($this->modelName);
         $this->namespace->addUse($nodeExtender, 'Node');
 
         $dataMethods->setTraits($this->opt->getDataMethodsTraits($this->modelName));

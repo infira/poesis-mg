@@ -319,12 +319,12 @@ class Options extends Config
         return $this->getDataMethodsConfig($model)['node'];
     }
 
-    public function getNodeExtender(string $model): ?string
+    public function getModelNodeExtender(string $model): ?string
     {
         return $this->getModelNodeConfig($model)['extender'] ?? '\Infira\Poesis\dr\Node';
     }
 
-    public function getMakeNode(string $model): bool
+    public function getMakeModelNode(string $model): bool
     {
         return (bool)$this->getModelNodeConfig($model);
     }
