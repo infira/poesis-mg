@@ -4,8 +4,6 @@ namespace Infira\pmg\helper;
 
 
 use Exception;
-use Infira\console\Bin;
-use Infira\console\helper\Config;
 use Nette\PhpGenerator\ClassType;
 use stdClass;
 use Wolo\File\File;
@@ -19,8 +17,7 @@ class Options extends Config
 
     public function __construct(string $yamlPath)
     {
-        parent::__construct(Bin::getPath('defaults.yaml'));
-        $this->mergeConfig($yamlPath);
+        parent::__construct($yamlPath);
         $default = $this->get('model');
 
         foreach (['modelExtends' => 'setModelExtender', 'modelTraits' => 'addModelTrait', 'modelInterfaces' => 'addModelInterface', 'modelImports' => 'addModelImport'] as $globalConf => $method) {
@@ -143,7 +140,7 @@ class Options extends Config
                 $this->setDataMethodsClass($dm->model, $dm->name);
             }
             else if ($dm = $this->findFileExtension($file, 'Node')) {
-                $this->setModelNodeExtendor($dm->model, $dm->name);
+                $this->setModelExtender($dm->model, $dm->name);
             }
         }
     }

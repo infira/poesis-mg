@@ -6,7 +6,7 @@
       "Infira\\pmg\\": "src/"
     }
   },
-  "minimum-stability": "dev",
+  "minimum-stability": "stable",
   "authors": [
     {
       "name": "Gen Taliar",
@@ -18,7 +18,9 @@
   ],
   "require": {
     "php": "^8.0",
-    "infira/console": "*",
+    "infira/console": "v1.0",
+    "symfony/yaml": "5.*",
+    "illuminate/support": "~9",
     "nette/php-generator": "v3.6.9",
     "nikic/php-parser": "v4.15.2"
   }

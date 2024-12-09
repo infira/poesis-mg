@@ -4,7 +4,7 @@ namespace Infira\pmg\templates;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Infira\console\Console;
+use Infira\Console\Output\Console;
 use Infira\pmg\helper\Options;
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\Method;

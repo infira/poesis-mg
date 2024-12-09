@@ -4,8 +4,7 @@ namespace Infira\pmg;
 
 
 use Illuminate\Support\Str;
-use Infira\console\Command;
-use Infira\console\Console;
+use Infira\Console\Command;
 use Infira\pmg\helper\Db;
 use Infira\pmg\helper\ModelColumn;
 use Infira\pmg\helper\Options;
@@ -34,7 +33,7 @@ class Pmg extends Command
 
     public function error($msg): void
     {
-        Console::$output->error($msg);
+        $this->console->error($msg);
     }
 
     public function configure(): void
@@ -86,15 +85,14 @@ class Pmg extends Command
         $this->madeFiles[] = $this->shortcut->save();
         $this->madeFiles[] = $this->schema->save();
 
-        $this->output->region('Made models', function () {
-            if ($this->output->isVerbose()) {
+        $this->console->region('Made models', function () {
+            if ($this->console->isVerbose()) {
                 foreach ($this->madeFiles as $file) {
-                    //$this->output->msg('<fg=#00aaff>Installed file</>: ' . str_replace($this->opt->getDestinationPath(), '', $file));
-                    $this->output->msg('<fg=#00aaff>Installed file</>: '.$file);
+                    $this->console->write('<fg=#00aaff>Installed file</>: '.$file);
                 }
             }
             else {
-                $this->output->info('Made '.count($this->madeFiles).' models into '.$this->opt->getDestinationPath());
+                $this->console->writeln('<info>Made '.count($this->madeFiles).' models into '.$this->opt->getDestinationPath().'</info>');
             }
         });
     }
