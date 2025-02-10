@@ -46,9 +46,11 @@ class Pmg extends Command
      */
     public function runCommand()
     {
-        $yamlFile = realpath($this->input->getArgument('yaml'));
+        $yamlArgument = $this->input->getArgument('yaml');
+        $yamlFile = realpath($yamlArgument);
         if (!file_exists($yamlFile)) {
-            $this->error('Config files does not exist');
+            $this->error("Config file('$yamlArgument') does not exist");
+            return;
         }
         $this->opt = new Options($yamlFile);
         $yamlPath = dirname($yamlFile);
