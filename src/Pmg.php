@@ -13,7 +13,10 @@ use Infira\pmg\templates\DbSchema;
 use Infira\pmg\templates\Model;
 use Infira\pmg\templates\ModelShortcut;
 use Infira\pmg\templates\Utils;
+use stdClass;
 use Symfony\Component\Console\Input\InputArgument;
+use Wolo\File\File;
+use Wolo\File\Folder;
 use Wolo\File\Path;
 use Wolo\Regex;
 
@@ -41,10 +44,7 @@ class Pmg extends Command
         $this->addArgument('yaml', InputArgument::REQUIRED);
     }
 
-    /**
-     * @throws \Exception
-     */
-    public function runCommand()
+    public function runCommand(): void
     {
         $yamlArgument = $this->input->getArgument('yaml');
         $yamlFile = realpath($yamlArgument);
@@ -77,7 +77,7 @@ class Pmg extends Command
         $connection = (object)$this->opt->get('connection');
         $this->db = new Db('pmg', $connection->host, $connection->user, $connection->pass, $connection->db, $connection->port);
         $this->dbName = $connection->db;
-        $this->opt->scanExtensions();
+        $this->scanExtensions();
 
 
         $this->shortcut = new ModelShortcut($this->opt);
@@ -114,17 +114,6 @@ class Pmg extends Command
         return true;
     }
 
-    private function makeModelName(string $table): string
-    {
-        if ($tableNamePattern = $this->opt->getModelTableNamePattern()) {
-            if ($match = Regex::match($tableNamePattern, $table)) {
-                $table = $match;
-            }
-        }
-        $prefix = $this->opt->getModelClassNamePrefix() ? $this->opt->getModelClassNamePrefix().'_' : '';
-        return Utils::className($prefix.$table);
-    }
-
     private function constructFullName(string $name): string
     {
         $name = Utils::className($name);
@@ -132,113 +121,119 @@ class Pmg extends Command
         return $this->opt->getNamespace() ? $this->opt->getNamespace().'\\'.$name : $name;
     }
 
-    /**
-     * @throws \Exception
-     */
+    private function scanExtensions(): void
+    {
+        $path = $this->opt->getExtensionsPath();
+        if (!is_dir($path)) {
+            $this->error("scan model extensions folder must be correct path($path)");
+        }
+        foreach (Folder::fileNames($path) as $fn) {
+            $file = Path::join($path, $fn);
+            if ($dm = $this->getExtensionAttributes($file, 'Model')) {
+                $this->opt->setModelExtender($dm->model, $dm->name);
+            }
+            else if ($dm = $this->getExtensionAttributes($file, 'Trait')) {
+                $this->opt->addModelTrait($dm->model, $dm->name);
+            }
+            else if ($dm = $this->getExtensionAttributes($file, 'DataMethods')) {
+                $this->opt->setModelDataMethodsClass($dm->model, $dm->name);
+            }
+            else if ($dm = $this->getExtensionAttributes($file, 'Node')) {
+                $this->opt->setModelExtender($dm->model, $dm->name);
+            }
+        }
+    }
+
+    private function getExtensionAttributes($file, $type): ?stdClass
+    {
+        $pi = (object)pathinfo($file);
+        $fileName = $pi->filename;
+
+        if (!preg_match('/(.+)('.$type.'.*)/m', $fileName, $matches)) {
+            return null;
+        }
+        $model = $matches[1];
+        $name = '\\'.$matches[0];
+
+        $fileContent = File::content($file);
+        if (Regex::match('/namespace (.+)?;/m', $fileContent)) {
+            $matches = [];
+            preg_match_all('/namespace (.+)?;/m', $fileContent, $matches);
+            $name = '\\'.$matches[1][0].$name;
+        }
+
+        return (object)['model' => $model, 'name' => $name];
+    }
+
     private function makeTableClassFiles(): void
     {
         //$model             = new Model(['isGenerator' => true]);
         $notAllowedColumns = [];//get_class_methods($model);
 
         $tables = $this->db->query("SHOW FULL TABLES");
-        if ($tables) {
-            $tablesData = [];
-            while ($Row = $tables->fetch_object()) {
-                $columnName = "Tables_in_".$this->dbName;
-                $tableName = $Row->$columnName;
-                if ($this->opt->canMake($tableName)) {
-                    unset($Row->$columnName);
-                    unset($dbName);
-                    $columnsRes = $this->db->query("SHOW FULL COLUMNS FROM`".$tableName.'`');
-
-                    if (!isset($tablesData[$tableName])) {
-                        $Table = $Row;
-                        $Table->columns = [];
-                        $tablesData[$tableName] = $Table;
-                    }
-
-                    while ($columnInfo = $columnsRes->fetch_array(MYSQLI_ASSOC)) {
-                        $tablesData[$tableName]->columns[$columnInfo['Field']] = $columnInfo;
-                        if (in_array($columnInfo['Field'], $notAllowedColumns)) {
-                            $this->error('Column <strong>'.$tableName.'.'.$columnInfo['Field'].'</strong> is system reserverd');
-                        }
-                    }
+        if (!$tables) {
+            return;
+        }
+        $tablesData = [];
+        while ($Table = $tables->fetch_object()) {
+            $columnName = "Tables_in_".$this->dbName;
+            $tableName = $Table->$columnName;
+            if (!$this->opt->canMakeModel($tableName)) {
+                continue;
+            }
+            $modelName = $this->opt->makeModelName($tableName);
+            $modelTemplate = new Model(
+                $modelName,
+                $tableName,
+                $Table,
+                $this->opt
+            );
+            $this->shortcut->addModel($this->constructFullName($modelName));
+            if ($result = $this->db->query("SHOW INDEX FROM `$tableName` WHERE Key_name = 'PRIMARY'")) {
+                while ($Index = $result->fetch_object()) {
+                    $modelTemplate->addPrimaryColumn($Index->Column_name);
                 }
             }
 
-            foreach ($tablesData as $tableName => $Table) {
-                $modelName = $this->makeModelName($tableName);
-                $modelTemplate = new Model(
-                    $modelName,
-                    $tableName,
-                    $this->opt
-                );
-                $modelTemplate->setModelExtender($this->opt->getModelExtender($modelName, $Table->Table_type === 'VIEW'));
-                if ($this->opt->isModelLogEnabled($modelName)) {
-                    $modelTemplate->addSchemaProperty('log', true);
-                }
-                if (($connectionName = $this->opt->getModelConnectionName($modelName)) !== 'defaultConnection') {
-                    $modelTemplate->addSchemaProperty('connection', $connectionName);
+            $columnsRes = $this->db->query("SHOW FULL COLUMNS FROM`".$tableName.'`');
+            while ($column = $columnsRes->fetch_array(MYSQLI_ASSOC)) {
+                if (in_array($column['Field'], $notAllowedColumns)) {
+                    $this->error('column <strong>'.$tableName.'.'.$column['Field'].'</strong> is system reserverd');
+                    break;
                 }
 
+                $columnName = $column['Field'];
+                if ($columnName == 'ttest') {
+                    debug($column);
+                    break;
+                }
+                $type = Str::lower(preg_replace('/\(.*\)/m', '', $column['Type']));
+                $type = strtolower(trim(str_replace("unsigned", "", $type)));
+                $column['fType'] = $type;
+                $modelColumn = new ModelColumn($column, $tableName);
 
-                if ($Table->Table_type === 'VIEW') {
-                    $modelTemplate->addSchemaProperty('isView', true);
-                }
-                $TIDColumnName = $this->opt->getTIDColumnName($modelName);
-                if ($TIDColumnName !== null && isset($Table->columns[$TIDColumnName])) {
-                    $modelTemplate->addSchemaProperty('TIDColumn', $TIDColumnName);
-                }
+                $modelTemplate->setColumn($modelColumn);
 
-                foreach ($this->opt->getModelTraits($modelName) as $trait) {
-                    $modelTemplate->addTrait($trait);
-                }
-                foreach ($this->opt->getModelInterfaces($modelName) as $interface) {
-                    $modelTemplate->addImplement($interface);
-                }
-
-                if ($result = $this->db->query("SHOW INDEX FROM `$tableName` WHERE Key_name = 'PRIMARY'")) {
-                    while ($Index = $result->fetch_object()) {
-                        $modelTemplate->addPrimaryColumn($Index->Column_name);
-                    }
+                if ($modelColumn->isAutoIncrement()) {
+                    $modelTemplate->addSchemaProperty('aiColumn', $columnName);
                 }
 
-                $this->shortcut->addModel($this->constructFullName($modelName));
+                $this->schema->setColumn($modelColumn);
+            } //EOF each columns
 
-                foreach ($Table->columns as $Column) {
-                    $columnName = $Column['Field'];
-                    if ($columnName == 'ttest') {
-                        debug($Column);
-                        continue;
-                    }
-                    $type = Str::lower(preg_replace('/\(.*\)/m', '', $Column['Type']));
-                    $type = strtolower(trim(str_replace("unsigned", "", $type)));
-                    $Column['fType'] = $type;
-                    $modelColumn = new ModelColumn($Column, $tableName);
-
-                    $modelTemplate->setColumn($modelColumn);
-
-                    if ($modelColumn->isAutoIncrement()) {
-                        $modelTemplate->addSchemaProperty('aiColumn', $columnName);
-                    }
-
-                    $this->schema->setColumn($modelColumn);
-                } //EOF each columns
-
-                //make index methods
-                $indexes = [];
-                if ($result = $this->db->query("SHOW INDEX FROM `$tableName`")) {
-                    while ($Index = $result->fetch_object()) {
-                        $indexes[$Index->Key_name][] = $Index;
-                    }
+            //make index methods
+            $indexes = [];
+            if ($result = $this->db->query("SHOW INDEX FROM `$tableName`")) {
+                while ($Index = $result->fetch_object()) {
+                    $indexes[$Index->Key_name][] = $Index;
                 }
-                $indexMethods = array_filter($indexes, static function ($var) {
-                    return count($var) > 1;
-                });
-                $modelTemplate->addIndexMethods($indexMethods);
-                $modelTemplate->addImports($this->opt->getModelImports($modelName));
-                $this->madeFiles[] = $modelTemplate->save(ClassPrinter::class);
             }
+            $indexMethods = array_filter($indexes, static function ($var) {
+                return count($var) > 1;
+            });
+            $modelTemplate->addIndexMethods($indexMethods);
+            $modelTemplate->addImports($this->opt->getModelImports($tableName));
+            $this->madeFiles[] = $modelTemplate->save(ClassPrinter::class);
         }
     }
 }

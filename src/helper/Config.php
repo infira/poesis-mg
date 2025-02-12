@@ -24,10 +24,13 @@ class Config
         return $this->config;
     }
 
-    public function get(string $configPath)
+    public function get(string $configPath, mixed $default = null)
     {
         if (!$this->exists($configPath)) {
-            throw new InvalidArgumentException("config path $configPath does not exist");
+            if (func_num_args() === 1) {
+                throw new InvalidArgumentException("config path $configPath does not exist");
+            }
+            return $default;
         }
         $to = &$this->config;
         foreach ($this->getPathArr($configPath) as $p) {
@@ -35,6 +38,15 @@ class Config
         }
 
         return $to;
+    }
+
+    public function getOnEmpty(string $configPath, mixed $default = null)
+    {
+        $output = $this->get($configPath, $default);
+        if (empty($output)) {
+            return $default;
+        }
+        return $output;
     }
 
     public function exists(string $configPath): bool

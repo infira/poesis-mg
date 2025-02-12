@@ -4,10 +4,8 @@ namespace Infira\pmg\helper;
 
 
 use Exception;
-use Nette\PhpGenerator\ClassType;
-use stdClass;
-use Wolo\File\File;
-use Wolo\File\Folder;
+use Infira\pmg\templates\Utils;
+use InvalidArgumentException;
 use Wolo\File\Path;
 use Wolo\Regex;
 
@@ -20,23 +18,9 @@ class Options extends Config
         parent::__construct($yamlPath);
         $default = $this->get('model');
 
-        foreach (['modelExtends' => 'setModelExtender', 'modelTraits' => 'addModelTrait', 'modelInterfaces' => 'addModelInterface', 'modelImports' => 'addModelImport'] as $globalConf => $method) {
-            if (!$this->exists($globalConf)) {
-                continue;
-            }
-            foreach ($this->get($globalConf) as $class => $models) {
-                foreach ($models as $model) {
-                    if (!$this->exists("models.$model")) {
-                        $this->set("models.$model", $default);
-                    }
-                    $this->$method($model, $class);
-                }
-            }
-        }
-
         if ($this->exists('models')) {
             foreach ($this->get('models') as $model => $conf) {
-                $this->set("models.$model", $default);
+                $this->set("models.$model", array_merge($default, $conf));
                 foreach ($conf as $name => $value) {
                     if (!$this->exists("model.$name")) {
                         throw new Exception("default model conf('$name') does not exists");
@@ -46,129 +30,14 @@ class Options extends Config
                     if ($defaultType == 'array' and $type != 'array') {
                         throw new Exception("cant merge non arrays of conf('$name')");
                     }
-                    else {
-                        $this->setModelConfig($model, $name, $value);
-                    }
                 }
             }
         }
-
-        $this->set('customModels', []);
-    }
-
-    private function checkModel(string $model)
-    {
-        if (!isset($this->config['models'][$model])) {
-            $this->set("models.$model", $this->config['model']);
-        }
-    }
-
-    private function setModelConfig(string $model, string $config, $configValue)
-    {
-        $this->checkModel($model);
-        $this->set("models.$model.$config", $configValue);
-    }
-
-    private function addToModelConfig(string $model, string $config, array $configValues)
-    {
-        $this->checkModel($model);
-        foreach ($configValues as $value) {
-            $this->add("models.$model.$config", $value);
-        }
-    }
-
-    private function getModelConfig(string $model): array
-    {
-        $this->checkModel($model);
-
-        return $this->config['models'][$model];
-    }
-
-    private function getConfig(string $name, $default = null)
-    {
-        if (array_key_exists($name, $this->config)) {
-            return $this->config[$name];
-        }
-
-        return $default;
-    }
-
-    public function isTableVoided(string $table): bool
-    {
-        $tables = $this->getConfig('voidTables', []);
-        if (!is_array($tables)) {
-            return false;
-        }
-
-        return in_array($table, $tables, true);
-    }
-
-    public function canMake(string $table): bool
-    {
-        if ($this->isTableVoided($table)) {
-            return false;
-        }
-        $makeOnly = $this->getConfig('makeOnlyTables', []);
-        if (!is_array($makeOnly)) {
-            return true;
-        }
-        if (count($makeOnly) <= 0) {
-            return true;
-        }
-
-        return in_array($table, $makeOnly, true);
-    }
-
-    public function scanExtensions()
-    {
-        $path = $this->getExtensionsPath();
-        if ($path === null) {
-            return;
-        }
-        if (!is_dir($path)) {
-            throw new Exception("scan model extensions folder must be correct path($path)");
-        }
-        foreach (Folder::fileNames($path) as $fn) {
-            $file = Path::join($path, $fn);
-            if ($dm = $this->findFileExtension($file, 'Model')) {
-                $this->setModelExtender($dm->model, $dm->name);
-            }
-            else if ($dm = $this->findFileExtension($file, 'Trait')) {
-                $this->addModelTrait($dm->model, $dm->name);
-            }
-            else if ($dm = $this->findFileExtension($file, 'DataMethods')) {
-                $this->setDataMethodsClass($dm->model, $dm->name);
-            }
-            else if ($dm = $this->findFileExtension($file, 'Node')) {
-                $this->setModelExtender($dm->model, $dm->name);
-            }
-        }
-    }
-
-    private function findFileExtension($file, $type): ?stdClass
-    {
-        $pi = (object)pathinfo($file);
-        $fileName = $pi->filename;
-
-        if (!preg_match('/(.+)('.$type.'.*)/m', $fileName, $matches)) {
-            return null;
-        }
-        $model = $matches[1];
-        $name = '\\'.$matches[0];
-
-        $fileContent = File::content($file);
-        if (Regex::match('/namespace (.+)?;/m', $fileContent)) {
-            $matches = [];
-            preg_match_all('/namespace (.+)?;/m', $fileContent, $matches);
-            $name = '\\'.$matches[1][0].$name;
-        }
-
-        return (object)['model' => $model, 'name' => $name];
     }
 
     public function getNamespace(string $default = ''): ?string
     {
-        return $this->getConfig('namespace', $default) ?? $default;
+        return $this->get('namespace', $default) ?? $default;
     }
 
     public function getDestinationPath(string ...$path): string
@@ -180,7 +49,7 @@ class Options extends Config
         return Path::join($this->config['destinationPath'], ...$path);
     }
 
-    public function setDestinationPath(string $path)
+    public function setDestinationPath(string $path): void
     {
         $this->config['destinationPath'] = $path;
     }
@@ -199,50 +68,70 @@ class Options extends Config
         $this->config['extensionsPath'] = $path;
     }
 
-    public function getColumnClass(string $model): ?string
+    //region model
+    public function canMakeModel(string $table): bool
     {
-        return $this->getModelConfig($model)['columnClass'];
-    }
-
-    public function hasCustomModel(string $name): bool
-    {
-        return $this->exists("customModels.$name");
-    }
-
-    public function getCustomModel(string $name): ClassType //TODO not need it anymore
-    {
-        return $this->get("customModels.$name");
-    }
-
-    public function setModelExtender(string $model, string $extender)
-    {
-        $this->setModelConfig($model, 'extender', $extender);
-    }
-
-    public function getModelExtender(string $table, bool $isView): string
-    {
-        if ($isView and $this->getModelConfig($table)['viewExtender']) {
-            return $this->getModelConfig($table)['viewExtender'];
+        if (in_array($table, $this->get('voidTables', []))) {
+            return false;
+        }
+        $makeOnly = $this->get('makeOnlyTables', []);
+        if (!is_array($makeOnly)) {
+            return true;
+        }
+        if (count($makeOnly) <= 0) {
+            return true;
         }
 
-        return $this->getModelConfig($table)['extender'] ?? '\Infira\Poesis\Model';
+        return in_array($table, $makeOnly, true);
     }
 
-    public function addModelTrait(string $model, string ...$trait)
+    public function makeModelName(string $table): string
+    {
+        if ($tableNamePattern = $this->getModelTableNamePattern()) {
+            if ($match = Regex::match($tableNamePattern, $table)) {
+                $table = $match;
+            }
+        }
+        if ($this->exists("tables.$table.modelName")) {
+            return $this->get("tables.$table.modelName");
+        }
+        $prefix = $this->get('model.prefix', '');
+        $prefix = $prefix ? $prefix.'_' : '';
+        return Utils::className($prefix.$table);
+    }
+
+    private function setModelConfig(string $model, string $config, $configValue): void
+    {
+        $this->set("models.$model.$config", $configValue);
+    }
+
+    public function getModelConfig(string $model, string $config, mixed $default = null): mixed
+    {
+        if (!$this->exists("model.$config")) {
+            throw new InvalidArgumentException("unknown model config('$config') does not exists");
+        }
+        $output = $this->get("models.$model.$config", $this->getOnEmpty("model.$config", $default));
+        if (!$output) {
+            return $default;
+        }
+        return $output;
+    }
+
+    private function addToModelConfig(string $model, string $config, array $configValues): void
+    {
+        foreach ($configValues as $value) {
+            $this->add("models.$model.$config", $value);
+        }
+    }
+
+    public function addModelTrait(string $model, string ...$trait): void
     {
         $this->addToModelConfig($model, 'traits', $trait);
     }
 
-    public function getModelTraits(string $model): array
+    public function getModelTraits(string $table): array
     {
-        return $this->getModelConfig($model)['traits'];
-    }
-
-    public function getModelInterfaces(string $model): array
-    {
-        $interfaces = $this->getModelConfig($model)['interfaces'] ?? [];
-
-        return $interfaces;
+        return $this->getModelConfig($this->makeModelName($table), 'traits', []);
     }
 
     public function addModelInterface(string $model, string ...$trait)
@@ -250,19 +139,39 @@ class Options extends Config
         $this->addToModelConfig($model, 'interfaces', $trait);
     }
 
-    public function getModelImports(string $model): array
-    {
-        return $this->getModelConfig($model)['imports'];
-    }
-
     public function addModelImport(string $model, string ...$trait)
     {
         $this->addToModelConfig($model, 'imports', $trait);
     }
 
-    public function getModelClassNamePrefix(): string
+    public function setModelExtender(string $model, string $extender): void
     {
-        return $this->config['model']['prefix'];
+        $this->setModelConfig($model, 'extender', $extender);
+    }
+
+    public function getModelColumnClass(string $table): string
+    {
+        return $this->getModelConfig($this->makeModelName($table), 'columnClass', '\Infira\Poesis\clause\ModelColumn');
+    }
+
+    public function getModelExtender(string $table, bool $isView): string
+    {
+        $model = $this->makeModelName($table);
+        $extender = $this->getModelConfig($model, 'extender', '\Infira\Poesis\Model');
+        if ($isView) {
+            $extender = $this->getModelConfig($model, 'viewExtender', $extender);
+        }
+        return $extender;
+    }
+
+    public function getModelInterfaces(string $table): array
+    {
+        return $this->getModelConfig($this->makeModelName($table), 'interfaces', []);
+    }
+
+    public function getModelImports(string $table): array
+    {
+        return $this->getModelConfig($this->makeModelName($table), 'imports', []);
     }
 
     public function getModelTableNamePattern(): ?string
@@ -275,61 +184,48 @@ class Options extends Config
         return $this->config['model']['fileExt'];
     }
 
-    public function getModelConnectionName(string $model): string
+    public function getModelConnectionName(string $table): string
     {
-        return $this->getModelConfig($model)['connectionName'];
+        return $this->getModelConfig($this->makeModelName($table), 'connectionName', 'defaultConnection');
     }
 
-    public function getTIDColumnName(string $model): ?string
+    public function getTIDColumnName(string $table): ?string
     {
-        return $this->getModelConfig($model)['TIDColumName'];
+        return $this->getModelConfig($this->makeModelName($table), 'TIDColumName');
     }
 
-    public function isModelLogEnabled(string $model): bool
+    public function isModelLogEnabled(string $table): bool
     {
-        return $this->getModelConfig($model)['log'];
+        return $this->getModelConfig($this->makeModelName($table), 'log', false);
     }
 
-    //region data methods
-    private function getDataMethodsConfig(string $model): ?array
+    public function getModelDataMethodsClass(string $table): string
     {
-        return $this->getModelConfig($model)['dataMethods'];
+        return $this->getModelConfig($this->makeModelName($table), 'dataMethods.class', self::$defaultDataModelsClass);
     }
 
-    public function getDataMethodsClass(string $model): ?string
+    public function setModelDataMethodsClass(string $model, string $extender): void
     {
-        return $this->getDataMethodsConfig($model)['class'] ?? self::$defaultDataModelsClass;
+        $this->setModelConfig($model, 'dataMethods.class', $extender);
     }
 
-    public function setDataMethodsClass(string $model, string $extender)
+    public function getModelDataMethodsTraits(string $table): array
     {
-        $this->setModelConfig("$model", 'dataMethods.class', $extender);
+        return $this->getModelConfig($this->makeModelName($table), 'dataMethods.traits', []);
     }
 
-    public function getDataMethodsTraits(string $model): array
+    public function getModelNodeExtender(string $table): string
     {
-        return $this->getDataMethodsConfig($model)['traits'];
+        return $this->getModelConfig($this->makeModelName($table), 'dataMethods.node.extender', '\Infira\Poesis\dr\Node');
     }
 
-    private function getModelNodeConfig(string $model): ?array
+    public function getMakeModelNode(string $table): bool
     {
-        return $this->getDataMethodsConfig($model)['node'];
-    }
-
-    public function getModelNodeExtender(string $model): ?string
-    {
-        return $this->getModelNodeConfig($model)['extender'] ?? '\Infira\Poesis\dr\Node';
-    }
-
-    public function getMakeModelNode(string $model): bool
-    {
-        return (bool)$this->getModelNodeConfig($model);
+        return (bool)$this->getModelConfig($this->makeModelName($table), 'dataMethods.node');
     }
 
     //endregion
 
-
-    //region shortcut options
     public function getShortcutImports(): array
     {
         return $this->config['modelShortcut']['imports'];
@@ -344,5 +240,5 @@ class Options extends Config
     {
         return $this->config['modelShortcut']['fileExt'];
     }
-    //endregion
+
 }

@@ -10,6 +10,7 @@ use Infira\pmg\helper\ModelColumn;
 use Infira\pmg\helper\Options;
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\Method;
+use stdClass;
 use Wolo\File\File;
 
 class Model extends ClassTemplate
@@ -29,10 +30,11 @@ class Model extends ClassTemplate
     public function __construct(
         private string $modelName,
         private string $tableName,
+        private stdClass $table,//mysql table info
         Options $opt
     ) {
         parent::__construct($opt, $opt->getNamespace());
-        $this->columnClass = $this->opt->getColumnClass($modelName) ?: '\Infira\Poesis\clause\ModelColumn';
+        $this->columnClass = $this->opt->getModelColumnClass($this->tableName);
         $this->existingComments = new Collection();
         $savedFile = $this->getFile();
         if ($this->modelFileExists = file_exists($savedFile)) {
@@ -45,7 +47,35 @@ class Model extends ClassTemplate
         $this->setAsGenerated();
         $this->namespace->addUse('\Infira\Poesis\clause\Field');
         $this->addSchemaProperty('table', $this->tableName);
-        $this->setDataMethodsClass($this->opt->getDataMethodsClass($this->modelName));
+        $this->setDataMethodsClass($this->opt->getModelDataMethodsClass($this->modelName));
+        $this->setModelExtender($this->opt->getModelExtender($this->tableName, $this->isView()));
+        if ($this->opt->isModelLogEnabled($this->tableName)) {
+            $this->addSchemaProperty('log', true);
+        }
+        if (($connectionName = $this->opt->getModelConnectionName($this->tableName)) !== 'defaultConnection') {
+            $this->addSchemaProperty('connection', $connectionName);
+        }
+
+        if ($this->isView()) {
+            $this->addSchemaProperty('isView', true);
+        }
+        $TIDColumnName = $this->opt->getTIDColumnName($this->tableName);
+        if ($TIDColumnName !== null && isset($this->table->columns[$TIDColumnName])) {
+            $this->addSchemaProperty('TIDColumn', $TIDColumnName);
+        }
+
+        foreach ($this->opt->getModelTraits($this->tableName) as $trait) {
+            $this->addTrait($trait);
+        }
+        foreach ($this->opt->getModelInterfaces($this->tableName) as $interface) {
+            $this->addImplement($interface);
+        }
+
+    }
+
+    public function isView(): bool
+    {
+        return $this->table->Table_type === 'VIEW';
     }
 
     private function setClassFromExistingFile(string $savedFile): void
@@ -72,11 +102,11 @@ class Model extends ClassTemplate
                 $comment = $comment->trim();
 
                 return $comment->isEmpty()
-                    || $comment->is('*@property '.$this->columnMethodReferenceType.' $Where*')
-                    || $comment->is('*@method '.$this->columnMethodReferenceType.' model*')
-                    || $comment->is($rejectPatterns->toArray())
-                    || $comment->is('*ORM model for*')
-                    || $comment->is('@generated*');
+                       || $comment->is('*@property '.$this->columnMethodReferenceType.' $Where*')
+                       || $comment->is('*@method '.$this->columnMethodReferenceType.' model*')
+                       || $comment->is($rejectPatterns->toArray())
+                       || $comment->is('*ORM model for*')
+                       || $comment->is('@generated*');
             });
         if ($comments->count()) {
             $this->existingComments = $this->existingComments->merge($comments->join(PHP_EOL));
@@ -206,10 +236,10 @@ class Model extends ClassTemplate
         $dataMethods->setExtends($dataMethods->getName());
 
 
-        $nodeExtender = $this->opt->getModelNodeExtender($this->modelName);
+        $nodeExtender = $this->opt->getModelNodeExtender($this->tableName);
         $this->namespace->addUse($nodeExtender, 'Node');
 
-        $dataMethods->setTraits($this->opt->getDataMethodsTraits($this->modelName));
+        $dataMethods->setTraits($this->opt->getModelDataMethodsTraits($this->tableName));
 
         $getNode = $dataMethods->createMethod('getNode');
         $getNode->setReturnType($nodeExtender)->isReturnNullable();
