@@ -55,25 +55,33 @@ class Pmg extends Command
         $this->opt = new Options($yamlFile);
         $yamlPath = dirname($yamlFile);
         $destinationPath = $this->opt->getDestinationPath();
+        if (!$destinationPath) {
+            $this->error('destinationPath not defined');
+            return;
+        }
+
         if ($destinationPath[0] !== '/') {
             $destinationPath = Path::join($yamlPath, $destinationPath);
         }
-        if ($this->validateWriteablePath($destinationPath)) {
-            $this->opt->setDestinationPath($destinationPath);
-        }
-        else {
+        if (!$this->validateWriteablePath($destinationPath)) {
             $this->error("destination path('$destinationPath') is not a folder or not writable");
+            return;
         }
+        $this->opt->setDestinationPath($destinationPath);
         $extensionsPath = $this->opt->getExtensionsPath();
+        if (!$extensionsPath) {
+            $this->error('destinationPath not defined');
+            return;
+        }
         if ($extensionsPath[0] !== '/') {
             $extensionsPath = Path::join($yamlPath, $extensionsPath);
         }
-        if ($this->validateWriteablePath($extensionsPath)) {
-            $this->opt->setExtensionsPath($extensionsPath);
-        }
-        else {
+        if (!$this->validateWriteablePath($extensionsPath)) {
             $this->error("extensions path('$extensionsPath') is not a folder or not writable");
+            return;
         }
+        $this->opt->setExtensionsPath($extensionsPath);
+
         $connection = (object)$this->opt->get('connection');
         $this->db = new Db('pmg', $connection->host, $connection->user, $connection->pass, $connection->db, $connection->port);
         $this->dbName = $connection->db;

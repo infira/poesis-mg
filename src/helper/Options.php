@@ -6,8 +6,6 @@ namespace Infira\pmg\helper;
 use Exception;
 use Infira\pmg\templates\Utils;
 use InvalidArgumentException;
-use Wolo\File\Path;
-use Wolo\Regex;
 
 class Options extends Config
 {
@@ -40,32 +38,24 @@ class Options extends Config
         return $this->get('namespace', $default) ?? $default;
     }
 
-    public function getDestinationPath(string ...$path): string
+    public function getDestinationPath(): string
     {
-        if (!$this->config['destinationPath']) {
-            throw new \RuntimeException('destinationPath not defined');
-        }
-
-        return Path::join($this->config['destinationPath'], ...$path);
+        return trim($this->get('destinationPath', ''));
     }
 
     public function setDestinationPath(string $path): void
     {
-        $this->config['destinationPath'] = $path;
+        $this->set('destinationPath', $path);
     }
 
-    public function getExtensionsPath(string ...$path): string
+    public function getExtensionsPath(): string
     {
-        if (!$this->config['extensionsPath']) {
-            throw new \RuntimeException('extensionsPath not defined');
-        }
-
-        return Path::join($this->config['extensionsPath'], ...$path);
+        return trim($this->get('extensionsPath', ''));
     }
 
     public function setExtensionsPath(string $path): void
     {
-        $this->config['extensionsPath'] = $path;
+        $this->set('extensionsPath', $path);
     }
 
     //region model
@@ -87,11 +77,6 @@ class Options extends Config
 
     public function makeModelName(string $table): string
     {
-        if ($tableNamePattern = $this->getModelTableNamePattern()) {
-            if ($match = Regex::match($tableNamePattern, $table)) {
-                $table = $match;
-            }
-        }
         if ($this->exists("tables.$table.modelName")) {
             return $this->get("tables.$table.modelName");
         }
@@ -174,14 +159,9 @@ class Options extends Config
         return $this->getModelConfig($this->makeModelName($table), 'imports', []);
     }
 
-    public function getModelTableNamePattern(): ?string
-    {
-        return $this->config['model']['modelTableNamePattern'] ?? null;
-    }
-
     public function getModelFileNameExtension(): string
     {
-        return $this->config['model']['fileExt'];
+        return $this->get('model.fileExt', 'php');
     }
 
     public function getModelConnectionName(string $table): string
@@ -228,17 +208,17 @@ class Options extends Config
 
     public function getShortcutImports(): array
     {
-        return $this->config['modelShortcut']['imports'];
+        return $this->get('modelShortcut.imports', []);
     }
 
     public function getShortcutName(): string
     {
-        return $this->config['modelShortcut']['name'];
+        return $this->get('modelShortcut.name', null);
     }
 
     public function getShortcutTraitFileNameExtension(): string
     {
-        return $this->config['modelShortcut']['fileExt'];
+        return $this->get('modelShortcut.fileExt', 'php');
     }
 
 }

@@ -133,7 +133,7 @@ class ClassTemplate
 
     protected function getFile(): string
     {
-        return $this->opt->getDestinationPath($this->constructFileName());
+        return Path::join($this->opt->getDestinationPath(), $this->constructFileName());
     }
 
     public function save(string $printer = Printer::class): string
